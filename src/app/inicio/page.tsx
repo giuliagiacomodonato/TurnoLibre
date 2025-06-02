@@ -1,102 +1,242 @@
-import Image from "next/image";
+'use client';
+
+import { useState, useMemo } from 'react';
+import { VenueInfo } from '../ui/VenueInfo';
+
+// Simulated data for a single venue
+const venueData = {
+  name: "Complejo Deportivo Bahía Club",
+  description: "Complejo deportivo de primer nivel con instalaciones modernas y amplias. Cuenta con canchas de fútbol, tenis, pádel y más. Ideal para practicar deportes en un ambiente agradable y profesional.",
+  address: "Av. Alem 1234, Bahía Blanca",
+  sports: ["Fútbol 5", "Fútbol 7", "Tenis", "Pádel", "Basket", "Voley"],
+  courts: [
+    { id: 1, name: "Cancha 1 (Fútbol 5)", sports: ["Fútbol 5"] },
+    { id: 2, name: "Cancha 2 (Fútbol 5)", sports: ["Fútbol 5"] },
+    { id: 3, name: "Cancha 3 (Fútbol 7)", sports: ["Fútbol 7"] },
+    { id: 4, name: "Cancha 4 (Tenis)", sports: ["Tenis"] },
+    { id: 5, name: "Cancha 5 (Pádel)", sports: ["Pádel"] },
+    { id: 6, name: "Cancha 6 (Basket)", sports: ["Basket"] },
+    { id: 7, name: "Cancha 7 (Voley)", sports: ["Voley"] },
+  ],
+  images: ["/canchas1.jpg", "/canchas2.jpg", "/canchas3.jpg"]
+};
+
+// Simulated availability data for a week
+const generateWeeklyAvailability = () => {
+  const today = new Date();
+  const availability: { [date: string]: { [courtId: number]: { time: string; available: boolean; }[] } } = {};
+
+  // Generate time slots from 13:00 to 23:00 in 1-hour intervals
+  const timeSlots = Array.from({ length: 11 }, (_, i) => {
+    const hour = i + 13;
+    return `${hour.toString().padStart(2, '0')}:00`;
+  });
+
+  // Only generate availability for the next 7 days
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(today);
+    date.setDate(today.getDate() + i);
+    const dateString = date.toISOString().split('T')[0];
+    availability[dateString] = {};
+
+    venueData.courts.forEach(court => {
+      availability[dateString][court.id] = timeSlots.map(time => ({
+        time,
+        available: Math.random() > 0.3 // Simulate random availability
+      }));
+    });
+  }
+  return availability;
+};
+
+const weeklyAvailability = generateWeeklyAvailability();
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [selectedSport, setSelectedSport] = useState(venueData.sports[0]);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const handlePreviousDay = () => {
+    const currentDate = new Date(selectedDate);
+    const previousDate = new Date(currentDate);
+    previousDate.setDate(currentDate.getDate() - 1);
+    const previousDateString = previousDate.toISOString().split('T')[0];
+    
+    // Only allow going back to today
+    if (previousDate >= new Date(new Date().setHours(0, 0, 0, 0))) {
+      setSelectedDate(previousDateString);
+    }
+  };
+
+  const handleNextDay = () => {
+    const currentDate = new Date(selectedDate);
+    const nextDate = new Date(currentDate);
+    nextDate.setDate(currentDate.getDate() + 1);
+    const nextDateString = nextDate.toISOString().split('T')[0];
+    
+    // Only allow going forward 7 days from today
+    const maxDate = new Date();
+    maxDate.setDate(maxDate.getDate() + 7);
+    if (nextDate <= maxDate) {
+      setSelectedDate(nextDateString);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('es-ES', { 
+      weekday: 'long', 
+      day: 'numeric', 
+      month: 'long' 
+    });
+  };
+
+  const filteredCourts = useMemo(() => {
+    return venueData.courts.filter(court =>
+      court.sports.includes(selectedSport)
+    );
+  }, [selectedSport]);
+
+  const weekDates = useMemo(() => {
+    const start = new Date(selectedDate);
+    const dates = [];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(start);
+      date.setDate(start.getDate() + i);
+      dates.push(date.toISOString().split('T')[0]);
+    }
+    return dates;
+  }, [selectedDate]);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-[#f2c57c]/20 to-[#7fb685]/20">
+      {/* Header */}
+      <header className="bg-[#426a5a]/90 backdrop-blur-sm shadow-sm sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex justify-between items-center">
+            <h1 className="text-2xl font-bold text-[#f2c57c]">TurnoLibre</h1>
+            <nav className="flex space-x-4">
+              <a href="#" className="text-[#f2c57c] hover:text-[#ddae7e] transition-colors">Inicio</a>
+              <a href="#" className="text-[#f2c57c] hover:text-[#ddae7e] transition-colors">Mi Reserva</a>
+            </nav>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          {/* Columna Izquierda: Selector de Deporte */}
+          <div className="lg:col-span-2">
+            <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-6 sticky top-24">
+              <label htmlFor="sport-select" className="block text-xl font-bold text-[#426a5a] mb-4">Deportes</label>
+              <div className="space-y-2">
+                {venueData.sports.map((sport) => (
+                  <button
+                    key={sport}
+                    onClick={() => setSelectedSport(sport)}
+                    className={`w-full px-4 py-2 rounded-lg text-left transition-colors ${
+                      selectedSport === sport
+                        ? 'bg-[#426a5a] text-white'
+                        : 'bg-white hover:bg-[#7fb685]/20 text-[#426a5a]'
+                    }`}
+                  >
+                    {sport}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Columna Central: Timeline */}
+          <div className="lg:col-span-10">
+            <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-6 mb-8">
+              {/* Selector de Fecha */}
+              <div className="mb-6 flex items-center justify-between">
+                <button
+                  onClick={handlePreviousDay}
+                  className="p-2 rounded-lg hover:bg-[#7fb685]/20 transition-colors"
+                  title="Día anterior"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-[#426a5a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                
+                <h2 className="text-xl font-bold text-[#426a5a] capitalize">
+                  {formatDate(selectedDate)}
+                </h2>
+
+                <button
+                  onClick={handleNextDay}
+                  className="p-2 rounded-lg hover:bg-[#7fb685]/20 transition-colors"
+                  title="Día siguiente"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-[#426a5a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Timeline Grid */}
+              <div className="overflow-x-auto">
+                <div className="w-full min-w-[800px]">
+                  {/* Encabezado de horarios */}
+                  <div className="grid grid-cols-[200px_repeat(11,1fr)] gap-1 text-center mb-4">
+                    <div className="col-span-1 font-bold text-[#426a5a]">Cancha</div>
+                    {Array.from({ length: 11 }, (_, i) => {
+                      const hour = i + 13;
+                      return (
+                        <div key={hour} className="font-bold text-[#426a5a]">
+                          {`${hour.toString().padStart(2, '0')}:00`}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Filas por cancha y slots por hora */}
+                  <div className="space-y-1">
+                    {filteredCourts.map(court => (
+                      <div key={court.id} className="grid grid-cols-[200px_repeat(11,1fr)] gap-1 items-center">
+                        {/* Nombre de la cancha */}
+                        <div className="text-sm font-semibold text-[#426a5a] pr-2">
+                          {court.name}
+                        </div>
+                        {/* Slots por hora */}
+                        {weeklyAvailability[selectedDate]?.[court.id]?.map(slot => (
+                          <div
+                            key={slot.time}
+                            className={`h-8 rounded ${
+                              slot.available 
+                                ? 'bg-[#7fb685] hover:bg-[#426a5a] cursor-pointer' 
+                                : 'bg-gray-300 cursor-not-allowed'
+                            } transition-colors`}
+                            title={`${slot.time} - ${slot.available ? 'Disponible' : 'No disponible'}`}
+                          />
+                        ))}
+                      </div>
+                    ))}
+                    {/* Mensaje si no hay canchas para el deporte seleccionado */}
+                    {filteredCourts.length === 0 && (
+                      <div className="col-span-full text-center text-gray-600 mt-8">
+                        No hay canchas disponibles para {selectedSport}.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Información del Complejo */}
+            <VenueInfo {...venueData} sports={venueData.sports} images={venueData.images} />
+          </div>
         </div>
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+
+      {/* Footer */}
+      <footer className="bg-[#426a5a]/90 backdrop-blur-sm mt-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <p className="text-center text-[#f2c57c]">Giulia Giacomodonato - Tomás Kreczmer</p>
+        </div>
       </footer>
     </div>
   );
