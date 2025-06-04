@@ -1,3 +1,5 @@
+'use client';
+
 import Link from 'next/link';
 
 export function Header() {
@@ -10,9 +12,9 @@ export function Header() {
           </Link>
           <nav className="flex space-x-4">
             <Link href="/inicio" className="text-[#f2c57c] hover:text-[#ddae7e] transition-colors">
-              Iniciar Sesión
+              Ver Disponibles
             </Link>
-            <Link href="/inicio" className="text-[#f2c57c] hover:text-[#ddae7e] transition-colors">
+            <Link href="/reservas" className="text-[#f2c57c] hover:text-[#ddae7e] transition-colors">
               Mis Reservas
             </Link>
             <Link href="/inicio" className="text-[#f2c57c] hover:text-[#ddae7e] transition-colors">
