@@ -37,6 +37,28 @@ model Facility {
   sportId       String
   sport         Sport     @relation(fields: [sportId], references: [id])
   reservations  Reservation[]
+  availability  FacilityAvailability[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model FacilityAvailability {
+  id            String    @id @default(uuid())
+  facilityId    String
+  facility      Facility  @relation(fields: [facilityId], references: [id])
+  dayOfWeek     Int      // 0 = Sunday, 1 = Monday... 6 = Saturday
+  openingTime   DateTime
+  closingTime   DateTime
+  slotDuration  Int      // in minutes
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Payment {
+  id            String    @id @default(uuid())
+  amount        Float
+  status        PaymentStatus @default(PENDING)
+  reservations  Reservation[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -47,12 +69,12 @@ model Reservation {
   user          User      @relation(fields: [userId], references: [id])
   facilityId    String
   facility      Facility  @relation(fields: [facilityId], references: [id])
+  paymentId     String?
+  payment       Payment?  @relation(fields: [paymentId], references: [id])
   date          DateTime
   startTime     DateTime
   endTime       DateTime
   status        ReservationStatus @default(PENDING)
-  paymentStatus PaymentStatus @default(PENDING)
-  paymentId     String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }

@@ -1,16 +1,14 @@
+'use client';
+
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { SessionProvider } from 'next-auth/react';
 
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
 });
-
-export const metadata: Metadata = {
-  title: "TurnoLibre - Reserva de Canchas",
-  description: "Sistema de reservas de canchas deportivas",
-};
 
 export default function RootLayout({
   children,
@@ -20,7 +18,9 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className={`${inter.variable} font-sans antialiased`}>
-        {children}
+        <SessionProvider>
+          {children}
+        </SessionProvider>
       </body>
     </html>
   );

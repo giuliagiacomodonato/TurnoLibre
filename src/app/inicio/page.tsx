@@ -2,6 +2,10 @@
 
 import { useState, useMemo } from 'react';
 import { VenueInfo } from '../ui/VenueInfo';
+import { Header } from '../ui/Header';
+import { ReservationDetailsPopup } from '../ui/ReservationDetailsPopup';
+import { LoginModal } from '../ui/LoginModal';
+import { useSession } from 'next-auth/react';
 
 // Simulated data for a single venue
 const venueData = {
@@ -18,7 +22,26 @@ const venueData = {
     { id: 6, name: "Cancha 6 (Basket)", sports: ["Basket"] },
     { id: 7, name: "Cancha 7 (Voley)", sports: ["Voley"] },
   ],
-  images: ["/canchas1.jpg", "/canchas2.jpg", "/canchas3.jpg"]
+  images: ["/canchas1.jpg", "/canchas2.jpg", "/canchas3.jpg"],
+  hours: [
+    { day: "Lunes", open: "08:00", close: "23:00" },
+    { day: "Martes", open: "08:00", close: "23:00" },
+    { day: "Miércoles", open: "08:00", close: "23:00" },
+    { day: "Jueves", open: "08:00", close: "23:00" },
+    { day: "Viernes", open: "08:00", close: "23:00" },
+    { day: "Sábado", open: "08:00", close: "23:00" },
+    { day: "Domingo", open: "08:00", close: "23:00" },
+  ],
+  services: [
+    "Estacionamiento",
+    "Vestuarios",
+    "Duchas",
+    "Iluminación",
+    "Cafetería",
+    "WiFi",
+    "Primeros auxilios",
+    "Alquiler de equipamiento"
+  ]
 };
 
 // Simulated availability data for a week
@@ -52,8 +75,11 @@ const generateWeeklyAvailability = () => {
 const weeklyAvailability = generateWeeklyAvailability();
 
 export default function Home() {
+  const { data: session } = useSession();
   const [selectedSport, setSelectedSport] = useState(venueData.sports[0]);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedSlot, setSelectedSlot] = useState<{ courtId: number; time: string; } | null>(null);
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   const handlePreviousDay = () => {
     const currentDate = new Date(selectedDate);
@@ -107,21 +133,54 @@ export default function Home() {
     return dates;
   }, [selectedDate]);
 
+  const handleSlotClick = (courtId: number, time: string, available: boolean) => {
+    if (available) {
+      setSelectedSlot({ courtId, time });
+    } else {
+      // Optionally show a message for unavailable slots
+      console.log('Slot not available');
+    }
+  };
+
+  const handleClosePopup = () => {
+    setSelectedSlot(null);
+  };
+
+  const handleCloseLoginModal = () => {
+    setShowLoginModal(false);
+  };
+
+  const handleReserve = () => {
+    if (!session) {
+      setShowLoginModal(true);
+      return;
+    }
+
+    if (selectedSlot) {
+      // TODO: Implement actual add to cart logic here (e.g., API call)
+      console.log(
+        `User ${session.user?.email} adding reservation for court ${selectedSlot.courtId} at ${selectedSlot.time} on ${selectedDate}`
+      );
+      // After adding to cart attempt, close the popup
+      handleClosePopup();
+      // Optionally, redirect to cart page or show confirmation
+    }
+  };
+
+  // Find the details of the selected court and slot for the popup
+  const selectedCourtDetails = selectedSlot
+    ? venueData.courts.find(court => court.id === selectedSlot.courtId)
+    : null;
+  
+  // Assuming a fixed duration and price for simplicity. 
+  // You would likely fetch this based on the court and time.
+  const slotDuration = 60; // minutes
+  const slotPrice = 10400; // example price
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#f2c57c]/20 to-[#7fb685]/20">
-      {/* Header */}
-      <header className="bg-[#426a5a]/90 backdrop-blur-sm shadow-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-[#f2c57c]">TurnoLibre</h1>
-            <nav className="flex space-x-4">
-              <a href="#" className="text-[#f2c57c] hover:text-[#ddae7e] transition-colors">Inicio</a>
-              <a href="#" className="text-[#f2c57c] hover:text-[#ddae7e] transition-colors">Mi Reserva</a>
-            </nav>
-          </div>
-        </div>
-      </header>
-
+      <Header />
+      
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -211,6 +270,7 @@ export default function Home() {
                                 : 'bg-gray-300 cursor-not-allowed'
                             } transition-colors`}
                             title={`${slot.time} - ${slot.available ? 'Disponible' : 'No disponible'}`}
+                            onClick={() => handleSlotClick(court.id, slot.time, slot.available)}
                           />
                         ))}
                       </div>
@@ -238,6 +298,25 @@ export default function Home() {
           <p className="text-center text-[#f2c57c]">Giulia Giacomodonato - Tomás Kreczmer</p>
         </div>
       </footer>
+
+      {/* Reservation Details Popup */}
+      {selectedSlot && selectedCourtDetails && (
+        <ReservationDetailsPopup
+          courtName={selectedCourtDetails.name}
+          time={selectedSlot.time}
+          // These should come from your availability data, not hardcoded
+          duration={slotDuration} 
+          price={slotPrice}
+          onReserve={handleReserve}
+          onClose={handleClosePopup}
+        />
+      )}
+
+      {/* Login Required Modal */}
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={handleCloseLoginModal}
+      />
     </div>
   );
 }
