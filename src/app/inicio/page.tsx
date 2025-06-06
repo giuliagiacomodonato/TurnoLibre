@@ -6,6 +6,7 @@ import { Header } from '../ui/Header';
 import { ReservationDetailsPopup } from '../ui/ReservationDetailsPopup';
 import { LoginModal } from '../ui/LoginModal';
 import { useSession } from 'next-auth/react';
+import { useCart } from '../ui/CartContext';
 
 // Simulated data for a single venue
 const venueData = {
@@ -80,6 +81,7 @@ export default function Home() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedSlot, setSelectedSlot] = useState<{ courtId: number; time: string; } | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const { addItem } = useCart();
 
   const handlePreviousDay = () => {
     const currentDate = new Date(selectedDate);
@@ -151,19 +153,17 @@ export default function Home() {
   };
 
   const handleReserve = () => {
-    if (!session) {
-      setShowLoginModal(true);
-      return;
-    }
-
-    if (selectedSlot) {
-      // TODO: Implement actual add to cart logic here (e.g., API call)
-      console.log(
-        `User ${session.user?.email} adding reservation for court ${selectedSlot.courtId} at ${selectedSlot.time} on ${selectedDate}`
-      );
-      // After adding to cart attempt, close the popup
+    if (selectedSlot && selectedCourtDetails) {
+      addItem({
+        id: `${selectedCourtDetails.id}-${selectedDate}-${selectedSlot.time}`,
+        name: `Reserva ${selectedCourtDetails.name}`,
+        date: selectedDate,
+        time: selectedSlot.time,
+        court: selectedCourtDetails.name,
+        price: slotPrice,
+        image: venueData.images[0],
+      });
       handleClosePopup();
-      // Optionally, redirect to cart page or show confirmation
     }
   };
 
