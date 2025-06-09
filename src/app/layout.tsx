@@ -19,7 +19,9 @@ export default function RootLayout({
     <html lang="es">
       <head>
         <title>TurnoLibre</title>
-        <link rel="icon" href="/logo.png" type="image/png" sizes="any" />
+        <link rel="icon" href="/logo.ico" type="image/x-icon" />
+        <link rel="shortcut icon" href="/logo.ico" type="image/x-icon" />
+        {/* Si existe /public/favicon.ico, reemplázalo por tu logo o elimínalo */}
       </head>
       <body className={`${inter.variable} font-sans antialiased`}>
         <CartProvider>

@@ -1,4 +1,3 @@
-
 import Link from 'next/link';
 
 export function Header() {
@@ -6,7 +5,8 @@ export function Header() {
     <header className="bg-[#426a5a]/90 backdrop-blur-sm shadow-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div className="flex justify-between items-center">
-          <Link href="/" className="text-2xl font-bold text-[#f2c57c] hover:text-[#ddae7e] transition-colors">
+          <Link href="/" className="flex items-center gap-2 text-2xl font-bold text-[#f2c57c] hover:text-[#ddae7e] transition-colors">
+            <img src="/logo.ico" alt="Logo" className="h-8 w-8 rounded-full" />
             TurnoLibre
           </Link>
           <nav className="flex space-x-4">
@@ -24,4 +24,4 @@ export function Header() {
       </div>
     </header>
   );
-} 
+}
