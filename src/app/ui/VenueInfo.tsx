@@ -6,6 +6,7 @@ interface VenueInfoProps {
   name: string;
   description: string;
   address: string;
+  phone: string;
   sports: string[];
   images: string[];
   hours: {
@@ -16,7 +17,7 @@ interface VenueInfoProps {
   services: string[];
 }
 
-export function VenueInfo({ name, description, address, sports, images, hours, services }: VenueInfoProps) {
+export function VenueInfo({ name, description, address, phone, sports, images, hours, services }: VenueInfoProps) {
   return (
     <div className="space-y-8">
       {/* Imágenes del complejo */}
@@ -36,7 +37,7 @@ export function VenueInfo({ name, description, address, sports, images, hours, s
       </div>
 
       {/* Componentes de ubicación, horarios y servicios */}
-      <VenueLocation address={address} />
+      <VenueLocation address={address} phone={phone} />
       <VenueHours hours={hours} />
       <VenueServices services={services} />
     </div>

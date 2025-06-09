@@ -1,8 +1,9 @@
 interface VenueLocationProps {
   address: string;
+  phone: string;
 }
 
-export function VenueLocation({ address }: VenueLocationProps) {
+export function VenueLocation({ address, phone }: VenueLocationProps) {
   return (
     <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-6 mb-8">
       <h3 className="text-xl font-bold text-[#426a5a] mb-4 flex items-center">
@@ -13,6 +14,7 @@ export function VenueLocation({ address }: VenueLocationProps) {
         Ubicación
       </h3>
       <p className="text-[#426a5a]">{address}</p>
+      <p className="text-[#426a5a] mt-2">Teléfono: {phone}</p>
       <div className="mt-4">
         <a 
           href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`}

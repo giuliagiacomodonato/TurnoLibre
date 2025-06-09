@@ -1,107 +1,186 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { VenueInfo } from '../ui/VenueInfo';
 import { Header } from '../ui/Header';
 import { ReservationDetailsPopup } from '../ui/ReservationDetailsPopup';
 import { LoginModal } from '../ui/LoginModal';
-import { useSession } from 'next-auth/react';
 import { useCart } from '../ui/CartContext';
 
-// Simulated data for a single venue
-const venueData = {
-  name: "Complejo Deportivo Bahía Club",
-  description: "Complejo deportivo de primer nivel con instalaciones modernas y amplias. Cuenta con canchas de fútbol, tenis, pádel y más. Ideal para practicar deportes en un ambiente agradable y profesional.",
-  address: "Av. Alem 1234, Bahía Blanca",
-  sports: ["Fútbol 5", "Fútbol 7", "Tenis", "Pádel", "Basket", "Voley"],
-  courts: [
-    { id: 1, name: "Cancha 1 (Fútbol 5)", sports: ["Fútbol 5"] },
-    { id: 2, name: "Cancha 2 (Fútbol 5)", sports: ["Fútbol 5"] },
-    { id: 3, name: "Cancha 3 (Fútbol 7)", sports: ["Fútbol 7"] },
-    { id: 4, name: "Cancha 4 (Tenis)", sports: ["Tenis"] },
-    { id: 5, name: "Cancha 5 (Pádel)", sports: ["Pádel"] },
-    { id: 6, name: "Cancha 6 (Basket)", sports: ["Basket"] },
-    { id: 7, name: "Cancha 7 (Voley)", sports: ["Voley"] },
-  ],
-  images: ["/canchas1.jpg", "/canchas2.jpg", "/canchas3.jpg"],
-  hours: [
-    { day: "Lunes", open: "08:00", close: "23:00" },
-    { day: "Martes", open: "08:00", close: "23:00" },
-    { day: "Miércoles", open: "08:00", close: "23:00" },
-    { day: "Jueves", open: "08:00", close: "23:00" },
-    { day: "Viernes", open: "08:00", close: "23:00" },
-    { day: "Sábado", open: "08:00", close: "23:00" },
-    { day: "Domingo", open: "08:00", close: "23:00" },
-  ],
-  services: [
-    "Estacionamiento",
-    "Vestuarios",
-    "Duchas",
-    "Iluminación",
-    "Cafetería",
-    "WiFi",
-    "Primeros auxilios",
-    "Alquiler de equipamiento"
-  ]
+type Sport = {
+  id: string;
+  name: string;
+  description: string | null;
+  facilities: Facility[];
 };
 
-// Simulated availability data for a week
-const generateWeeklyAvailability = () => {
-  const today = new Date();
-  const availability: { [date: string]: { [courtId: number]: { time: string; available: boolean; }[] } } = {};
-
-  // Generate time slots from 13:00 to 23:00 in 1-hour intervals
-  const timeSlots = Array.from({ length: 11 }, (_, i) => {
-    const hour = i + 13;
-    return `${hour.toString().padStart(2, '0')}:00`;
-  });
-
-  // Only generate availability for the next 7 days
-  for (let i = 0; i < 7; i++) {
-    const date = new Date(today);
-    date.setDate(today.getDate() + i);
-    const dateString = date.toISOString().split('T')[0];
-    availability[dateString] = {};
-
-    venueData.courts.forEach(court => {
-      availability[dateString][court.id] = timeSlots.map(time => ({
-        time,
-        available: Math.random() > 0.3 // Simulate random availability
-      }));
-    });
-  }
-  return availability;
+type Facility = {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number;
+  sportId: string;
+  locationId: string;
+  location: Location;
+  reservations: Reservation[];
 };
 
-const weeklyAvailability = generateWeeklyAvailability();
+type Location = {
+  id: string;
+  name: string;
+  address: string;
+  phone: string;
+  description: string | null;
+  services: string[];
+  schedules: LocationSchedule[];
+};
+
+type LocationSchedule = {
+  id: string;
+  dayOfWeek: number;
+  isOpen: boolean;
+  openingTime: string;
+  closingTime: string;
+};
+
+type Reservation = {
+  id: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  status: string;
+};
+
+type Availability = {
+  [date: string]: {
+    [facilityId: string]: {
+      time: string;
+      available: boolean;
+    }[];
+  };
+};
 
 export default function Home() {
-  const { data: session } = useSession();
-  const [selectedSport, setSelectedSport] = useState(venueData.sports[0]);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [selectedSlot, setSelectedSlot] = useState<{ courtId: number; time: string; } | null>(null);
+  const [sports, setSports] = useState<Sport[]>([]);
+  const [location, setLocation] = useState<Location | null>(null);
+  const [selectedSport, setSelectedSport] = useState<string>('');
+  const [selectedDate, setSelectedDate] = useState('');
+  const [selectedSlot, setSelectedSlot] = useState<{ facilityId: string; time: string; } | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const { addItem } = useCart();
+  const [availability, setAvailability] = useState<Availability>({});
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+
+  // Function to fetch initial data (sports and location)
+  const fetchInitialData = async () => {
+    try {
+      const [sportsRes, locationRes] = await Promise.all([
+        fetch('/api/sports'),
+        fetch('/api/location')
+      ]);
+
+      const sportsData = await sportsRes.json();
+      const locationData = await locationRes.json();
+
+      const sportsWithFacilities = sportsData.filter((sport: Sport) => sport.facilities.length > 0);
+      setSports(sportsWithFacilities);
+      setLocation(locationData);
+
+      // Inicializar selectedDate si no está seteado
+      if (!selectedDate) {
+        setSelectedDate(new Date().toISOString().split('T')[0]);
+      }
+      if (sportsWithFacilities.length > 0) {
+        setSelectedSport(sportsWithFacilities[0].id);
+      }
+    } catch (error) {
+      console.error('Error fetching initial data:', error);
+    }
+  };
+
+  // Function to fetch latest sports data and generate availability
+  const updateAvailability = async () => {
+    try {
+      const sportsRes = await fetch('/api/sports');
+      const sportsData = await sportsRes.json();
+      const sportsWithFacilities: Sport[] = sportsData.filter((sport: Sport) => sport.facilities.length > 0);
+      setSports(sportsWithFacilities);
+
+      const newAvailability: Availability = {};
+      const timeSlots = Array.from({ length: 11 }, (_, i) => {
+        const hour = i + 13;
+        return `${hour.toString().padStart(2, '0')}:00`;
+      });
+
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(selectedDate);
+        date.setDate(date.getDate() + i);
+        const dateString = date.toISOString().split('T')[0];
+        newAvailability[dateString] = {};
+
+        const sport = sportsWithFacilities.find((s: Sport) => s.id === selectedSport);
+        if (sport) {
+          for (const facility of sport.facilities) {
+            // Consultar slots bloqueados desde la API
+            const blocksRes = await fetch(`/api/availability/blocks?date=${dateString}&facilityId=${facility.id}`);
+            const blocks = await blocksRes.json();
+
+            newAvailability[dateString][facility.id] = timeSlots.map(time => {
+              // Convertir block.startTime a horario local antes de comparar
+              const isBlocked = blocks.some((block: any) => {
+                const blockStart = new Date(block.startTime);
+                // Convertir a horario local
+                const localHour = blockStart.getHours().toString().padStart(2, '0');
+                const localMinute = blockStart.getMinutes().toString().padStart(2, '0');
+                const localTimeStr = `${localHour}:${localMinute}`;
+                return localTimeStr === time;
+              });
+              return {
+                time,
+                available: !isBlocked
+              };
+            });
+          }
+        }
+      }
+      setAvailability(newAvailability);
+    } catch (error) {
+      console.error('Error updating availability:', error);
+    }
+  };
+
+  // Initial data fetch on component mount
+  useEffect(() => {
+    fetchInitialData();
+  }, []);
+
+  // Forzar updateAvailability cuando selectedSport o selectedDate cambian y ambos están seteados
+  useEffect(() => {
+    if (selectedSport && selectedDate) {
+      updateAvailability();
+    }
+  }, [selectedSport, selectedDate]);
 
   const handlePreviousDay = () => {
+    if (!selectedDate) return; // Add this check
     const currentDate = new Date(selectedDate);
     const previousDate = new Date(currentDate);
     previousDate.setDate(currentDate.getDate() - 1);
     const previousDateString = previousDate.toISOString().split('T')[0];
     
-    // Only allow going back to today
     if (previousDate >= new Date(new Date().setHours(0, 0, 0, 0))) {
       setSelectedDate(previousDateString);
     }
   };
 
   const handleNextDay = () => {
+    if (!selectedDate) return; // Add this check
     const currentDate = new Date(selectedDate);
     const nextDate = new Date(currentDate);
     nextDate.setDate(currentDate.getDate() + 1);
     const nextDateString = nextDate.toISOString().split('T')[0];
     
-    // Only allow going forward 7 days from today
     const maxDate = new Date();
     maxDate.setDate(maxDate.getDate() + 7);
     if (nextDate <= maxDate) {
@@ -110,6 +189,7 @@ export default function Home() {
   };
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return '';
     const date = new Date(dateString);
     return date.toLocaleDateString('es-ES', { 
       weekday: 'long', 
@@ -118,13 +198,13 @@ export default function Home() {
     });
   };
 
-  const filteredCourts = useMemo(() => {
-    return venueData.courts.filter(court =>
-      court.sports.includes(selectedSport)
-    );
-  }, [selectedSport]);
+  const filteredFacilities = useMemo(() => {
+    const sport = sports.find(s => s.id === selectedSport);
+    return sport?.facilities || [];
+  }, [selectedSport, sports]);
 
   const weekDates = useMemo(() => {
+    if (!selectedDate) return [];
     const start = new Date(selectedDate);
     const dates = [];
     for (let i = 0; i < 7; i++) {
@@ -135,12 +215,9 @@ export default function Home() {
     return dates;
   }, [selectedDate]);
 
-  const handleSlotClick = (courtId: number, time: string, available: boolean) => {
+  const handleSlotClick = (facilityId: string, time: string, available: boolean) => {
     if (available) {
-      setSelectedSlot({ courtId, time });
-    } else {
-      // Optionally show a message for unavailable slots
-      console.log('Slot not available');
+      setSelectedSlot({ facilityId, time });
     }
   };
 
@@ -153,63 +230,62 @@ export default function Home() {
   };
 
   const handleReserve = () => {
-    if (selectedSlot && selectedCourtDetails) {
+    if (selectedSlot && selectedFacilityDetails) {
       addItem({
-        id: `${selectedCourtDetails.id}-${selectedDate}-${selectedSlot.time}`,
-        name: `Reserva ${selectedCourtDetails.name}`,
+        id: `${selectedFacilityDetails.id}-${selectedDate}-${selectedSlot.time}`,
+        name: `Reserva ${selectedFacilityDetails.name}`,
         date: selectedDate,
         time: selectedSlot.time,
-        court: selectedCourtDetails.name,
-        price: slotPrice,
-        image: venueData.images[0],
+        court: selectedFacilityDetails.name,
+        price: selectedFacilityDetails.price,
+        image: '/canchas1.jpg', // You might want to add images to your facilities
       });
       handleClosePopup();
+      // Re-fetch data to update availability after a reservation
+      updateAvailability(); // Call the new update function
     }
   };
 
-  // Find the details of the selected court and slot for the popup
-  const selectedCourtDetails = selectedSlot
-    ? venueData.courts.find(court => court.id === selectedSlot.courtId)
+  const selectedFacilityDetails = selectedSlot
+    ? filteredFacilities.find(facility => facility.id === selectedSlot.facilityId)
     : null;
-  
-  // Assuming a fixed duration and price for simplicity. 
-  // You would likely fetch this based on the court and time.
-  const slotDuration = 60; // minutes
-  const slotPrice = 10400; // example price
+
+  if (!location) {
+    return <div>Cargando...</div>;
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#f2c57c]/20 to-[#7fb685]/20">
+    <div className="min-h-screen bg-[#426a5a]">
       <Header />
       
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* Columna Izquierda: Selector de Deporte */}
+      <main className="container mx-auto px-4 py-8">
+        <div className="grid grid-cols-12 gap-8">
+          {/* Sidebar */}
           <div className="lg:col-span-2">
-            <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-6 sticky top-24">
-              <label htmlFor="sport-select" className="block text-xl font-bold text-[#426a5a] mb-4">Deportes</label>
+            <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-6">
+              <h2 className="text-xl font-bold text-[#426a5a] mb-4">Deportes</h2>
               <div className="space-y-2">
-                {venueData.sports.map((sport) => (
+                {sports.map(sport => (
                   <button
-                    key={sport}
-                    onClick={() => setSelectedSport(sport)}
-                    className={`w-full px-4 py-2 rounded-lg text-left transition-colors ${
-                      selectedSport === sport
+                    key={sport.id}
+                    onClick={() => setSelectedSport(sport.id)}
+                    className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
+                      selectedSport === sport.id
                         ? 'bg-[#426a5a] text-white'
-                        : 'bg-white hover:bg-[#7fb685]/20 text-[#426a5a]'
+                        : 'text-[#426a5a] hover:bg-[#7fb685]/20'
                     }`}
                   >
-                    {sport}
+                    {sport.name}
                   </button>
                 ))}
               </div>
             </div>
           </div>
 
-          {/* Columna Central: Timeline */}
+          {/* Main Content */}
           <div className="lg:col-span-10">
             <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-6 mb-8">
-              {/* Selector de Fecha */}
+              {/* Date Selector */}
               <div className="mb-6 flex items-center justify-between">
                 <button
                   onClick={handlePreviousDay}
@@ -239,7 +315,7 @@ export default function Home() {
               {/* Timeline Grid */}
               <div className="overflow-x-auto">
                 <div className="w-full min-w-[800px]">
-                  {/* Encabezado de horarios */}
+                  {/* Time Headers */}
                   <div className="grid grid-cols-[200px_repeat(11,1fr)] gap-1 text-center mb-4">
                     <div className="col-span-1 font-bold text-[#426a5a]">Cancha</div>
                     {Array.from({ length: 11 }, (_, i) => {
@@ -252,61 +328,68 @@ export default function Home() {
                     })}
                   </div>
 
-                  {/* Filas por cancha y slots por hora */}
-                  <div className="space-y-1">
-                    {filteredCourts.map(court => (
-                      <div key={court.id} className="grid grid-cols-[200px_repeat(11,1fr)] gap-1 items-center">
-                        {/* Nombre de la cancha */}
-                        <div className="text-sm font-semibold text-[#426a5a] pr-2">
-                          {court.name}
-                        </div>
-                        {/* Slots por hora */}
-                        {weeklyAvailability[selectedDate]?.[court.id]?.map(slot => (
-                          <div
-                            key={slot.time}
-                            className={`h-8 rounded ${
-                              slot.available 
-                                ? 'bg-[#7fb685] hover:bg-[#426a5a] cursor-pointer' 
-                                : 'bg-gray-300 cursor-not-allowed'
-                            } transition-colors`}
-                            title={`${slot.time} - ${slot.available ? 'Disponible' : 'No disponible'}`}
-                            onClick={() => handleSlotClick(court.id, slot.time, slot.available)}
-                          />
-                        ))}
+                  {/* Facility Rows */}
+                  {filteredFacilities.map(facility => (
+                    <div key={facility.id} className="grid grid-cols-[200px_repeat(11,1fr)] gap-1 items-center mb-4">
+                      <div className="text-sm font-semibold text-[#426a5a] pr-2">
+                        {facility.name}
                       </div>
-                    ))}
-                    {/* Mensaje si no hay canchas para el deporte seleccionado */}
-                    {filteredCourts.length === 0 && (
-                      <div className="col-span-full text-center text-gray-600 mt-8">
-                        No hay canchas disponibles para {selectedSport}.
-                      </div>
-                    )}
-                  </div>
+                      {availability[selectedDate]?.[facility.id]?.map(slot => (
+                        <div
+                          key={slot.time}
+                          className={`h-8 rounded ${
+                            slot.available 
+                              ? 'bg-[#7fb685] hover:bg-[#426a5a] cursor-pointer' 
+                              : 'bg-gray-300 cursor-not-allowed'
+                          } transition-colors`}
+                          title={`${slot.time} - ${slot.available ? 'Disponible' : 'No disponible'}`}
+                          onClick={() => handleSlotClick(facility.id, slot.time, slot.available)}
+                        />
+                      ))}
+                    </div>
+                  ))}
+                  {filteredFacilities.length === 0 && (
+                    <div className="col-span-full text-center text-gray-600 mt-8">
+                      No hay canchas disponibles para este deporte.
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* Información del Complejo */}
-            <VenueInfo {...venueData} sports={venueData.sports} images={venueData.images} />
+            {/* Venue Info */}
+            <VenueInfo
+              name={location.name}
+              description={location.description || ''}
+              address={location.address}
+              phone={location.phone}
+              sports={sports.map(s => s.name)}
+              services={location.services}
+              images={['/canchas1.jpg', '/canchas2.jpg', '/canchas3.jpg']}
+              hours={location.schedules.map(schedule => ({
+                day: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][schedule.dayOfWeek],
+                open: new Date(schedule.openingTime).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+                close: new Date(schedule.closingTime).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+              }))}
+            />
           </div>
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="bg-[#426a5a]/90 backdrop-blur-sm mt-8">
+      <footer className="bg-[#426a5a]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <p className="text-center text-[#f2c57c]">Giulia Giacomodonato - Tomás Kreczmer</p>
         </div>
       </footer>
 
       {/* Reservation Details Popup */}
-      {selectedSlot && selectedCourtDetails && (
+      {selectedSlot && selectedFacilityDetails && (
         <ReservationDetailsPopup
-          courtName={selectedCourtDetails.name}
+          courtName={selectedFacilityDetails.name}
           time={selectedSlot.time}
-          // These should come from your availability data, not hardcoded
-          duration={slotDuration} 
-          price={slotPrice}
+          duration={60}
+          price={selectedFacilityDetails.price}
           onReserve={handleReserve}
           onClose={handleClosePopup}
         />
@@ -317,6 +400,12 @@ export default function Home() {
         isOpen={showLoginModal}
         onClose={handleCloseLoginModal}
       />
+
+      {showToast && (
+        <div className={`fixed bottom-4 right-4 bg-gray-800 text-white px-4 py-2 rounded shadow-lg transition-opacity duration-300 ${showToast ? 'opacity-100' : 'opacity-0'}`}>
+          {toastMessage}
+        </div>
+      )}
     </div>
   );
 }

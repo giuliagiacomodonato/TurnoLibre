@@ -3,21 +3,14 @@ import { useState } from 'react';
 import { Cart } from '../../ui/Cart';
 import { Header } from '../../ui/Header';
 import { useCart } from '../../ui/CartContext';
-import { useSession } from 'next-auth/react';
 import { LoginModal } from '../../ui/LoginModal';
 
 export default function CarritoPage() {
   const { items, removeItem } = useCart();
-  const { data: session } = useSession();
   const [showLogin, setShowLogin] = useState(false);
 
   const handleCheckout = () => {
-    if (!session) {
-      setShowLogin(true);
-    } else {
-      // Aquí iría el flujo de pago real
-      alert('¡Listo para pagar!');
-    }
+    alert('¡Listo para pagar!');
   };
 
   return (

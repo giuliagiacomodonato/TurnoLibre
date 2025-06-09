@@ -128,7 +128,7 @@ enum ReservationStatus {
   PENDING
   CONFIRMED
   CANCELLED
-  COMPLETED
+  BLOCKED
 }
 
 enum PaymentStatus {

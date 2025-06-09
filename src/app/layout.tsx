@@ -3,7 +3,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { SessionProvider } from 'next-auth/react';
 import { CartProvider } from './ui/CartContext';
 
 const inter = Inter({
@@ -18,12 +17,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es">
+      <head>
+        <title>TurnoLibre</title>
+        <link rel="icon" href="/logo.png" type="image/png" sizes="any" />
+      </head>
       <body className={`${inter.variable} font-sans antialiased`}>
-        <SessionProvider>
-          <CartProvider>
-            {children}
-          </CartProvider>
-        </SessionProvider>
+        <CartProvider>
+          {children}
+        </CartProvider>
       </body>
     </html>
   );
