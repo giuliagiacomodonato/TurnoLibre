@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, PaymentStatus, ReservationStatus, Role } from '@prisma/client';
 import { hash } from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -14,7 +14,7 @@ async function main() {
       email: 'admin@complejo.com',
       name: 'Administrador',
       password: adminPassword,
-      role: 'ADMIN',
+      role: Role.ADMIN,
     },
   });
 
@@ -23,7 +23,7 @@ async function main() {
       email: 'usuario@ejemplo.com',
       name: 'Usuario Ejemplo',
       password: userPassword,
-      role: 'USER',
+      role: Role.USER,
     },
   });
 
@@ -135,7 +135,15 @@ async function main() {
     }),
   ]);
 
-  // Crear algunas reservas de ejemplo
+  // Crear el pago primero
+  const pago = await prisma.payment.create({
+    data: {
+      amount: 8000,
+      status: PaymentStatus.PAID,
+    },
+  });
+
+  // Luego la reserva asociada
   await prisma.reservation.create({
     data: {
       userId: user.id,
@@ -143,13 +151,8 @@ async function main() {
       date: new Date('2024-03-20'),
       startTime: new Date('2024-03-20T18:00:00Z'),
       endTime: new Date('2024-03-20T19:00:00Z'),
-      status: 'CONFIRMED',
-      payment: {
-        create: {
-          amount: 8000,
-          status: 'PAID',
-        },
-      },
+      status: ReservationStatus.CONFIRMED,
+      paymentId: pago.id,
     },
   });
 
