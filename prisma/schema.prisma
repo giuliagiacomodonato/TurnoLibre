@@ -30,14 +30,43 @@ model Sport {
   updatedAt     DateTime  @updatedAt
 }
 
+model Location {
+  id            String    @id @default(uuid())
+  name          String
+  address       String
+  phone         String
+  description   String?
+  services      String[]  // Array of service names
+  facilities    Facility[]
+  schedules     LocationSchedule[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model LocationSchedule {
+  id            String    @id @default(uuid())
+  locationId    String
+  location      Location  @relation(fields: [locationId], references: [id])
+  dayOfWeek     Int      // 0 = Sunday, 1 = Monday... 6 = Saturday
+  isOpen        Boolean   @default(true)
+  openingTime   DateTime
+  closingTime   DateTime
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
 model Facility {
   id            String    @id @default(uuid())
   name          String
   description   String?
+  price         Float     // Precio por hora/reserva
   sportId       String
   sport         Sport     @relation(fields: [sportId], references: [id])
+  locationId    String
+  location      Location  @relation(fields: [locationId], references: [id])
   reservations  Reservation[]
   availability  FacilityAvailability[]
+  schedules     FacilitySchedule[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -50,6 +79,17 @@ model FacilityAvailability {
   openingTime   DateTime
   closingTime   DateTime
   slotDuration  Int      // in minutes
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model FacilitySchedule {
+  id            String    @id @default(uuid())
+  facilityId    String
+  facility      Facility  @relation(fields: [facilityId], references: [id])
+  dayOfWeek     Int?     // null means "Todos los días"
+  openingTime   DateTime
+  closingTime   DateTime
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
