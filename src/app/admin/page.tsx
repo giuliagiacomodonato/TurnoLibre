@@ -1,46 +1,38 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
-export default function AdminHome() {
+export default function AdminPage() {
+  const router = useRouter();
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-[#f2c57c]/20 to-[#7fb685]/20">
-      <div className="bg-white/90 rounded-2xl shadow-xl p-10 flex flex-col gap-8 items-center">
-        <h1 className="text-3xl font-bold text-[#426a5a] mb-4">Panel de Administración</h1>
-        <div className="flex flex-col gap-4 w-64">
-          <Link
-            href="/admin/editar-complejo"
-            className="w-full bg-[#426a5a] text-white font-bold py-3 px-4 rounded-lg shadow-md hover:bg-[#7fb685] transition-colors duration-300 text-center"
-          >
-            Editar complejo
-          </Link>
-          <Link
-            href="/admin/cancha-horarios"
-            className="w-full bg-[#426a5a] text-white font-bold py-3 px-4 rounded-lg shadow-md hover:bg-[#7fb685] transition-colors duration-300 text-center"
-          >
-            Editar horarios de canchas
-          </Link>
-          <Link
-            href="/admin/editar-disponibilidad"
-            className="w-full bg-[#426a5a] text-white font-bold py-3 px-4 rounded-lg shadow-md hover:bg-[#7fb685] transition-colors duration-300 text-center"
-          >
-            Editar Disponibilidad
-          </Link>
-          <Link
-            href="#"
-            tabIndex={-1}
-            aria-disabled="true"
-            className="w-full bg-[#7fb685] text-white font-bold py-3 px-4 rounded-lg shadow-md opacity-60 cursor-not-allowed text-center pointer-events-none"
-          >
-            Ver reservas (próximamente)
-          </Link>
-          <Link
-            href="#"
-            tabIndex={-1}
-            aria-disabled="true"
-            className="w-full bg-[#f2c57c] text-[#426a5a] font-bold py-3 px-4 rounded-lg shadow-md opacity-60 cursor-not-allowed text-center pointer-events-none"
-          >
-            Estadísticas (próximamente)
-          </Link>
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold text-[#426a5a] mb-8">Panel de Administración</h1>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <Link href="/admin/editar-disponibilidad" className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow">
+          <h2 className="text-xl font-bold text-[#426a5a] mb-2">Editar Disponibilidad</h2>
+          <p className="text-gray-600">Gestionar la disponibilidad de las canchas y sus horarios</p>
+        </Link>
+
+        <Link href="/admin/ver-reservas" className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow">
+          <h2 className="text-xl font-bold text-[#426a5a] mb-2">Ver Reservas</h2>
+          <p className="text-gray-600">Ver y gestionar todas las reservas del sistema</p>
+        </Link>
+
+        <Link href="/admin/cancha-horarios" className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow">
+          <h2 className="text-xl font-bold text-[#426a5a] mb-2">Editar Canchas y Horarios</h2>
+          <p className="text-gray-600">Configurar canchas, deportes y horarios disponibles</p>
+        </Link>
+
+        <Link href="/admin/editar-complejo" className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow">
+          <h2 className="text-xl font-bold text-[#426a5a] mb-2">Editar Complejo</h2>
+          <p className="text-gray-600">Modificar información general del complejo deportivo</p>
+        </Link>
+
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <h2 className="text-xl font-bold text-[#426a5a] mb-2">Gestionar Usuarios</h2>
+          <p className="text-gray-600">Administrar usuarios y sus permisos</p>
         </div>
       </div>
     </div>
