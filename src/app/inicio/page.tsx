@@ -367,7 +367,9 @@ export default function Home() {
               services={location.services}
               images={['/canchas1.jpg', '/canchas2.jpg', '/canchas3.jpg']}
               hours={location.schedules.map(schedule => ({
-                day: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][schedule.dayOfWeek],
+                day: schedule.dayOfWeek === 7 || schedule.dayOfWeek === undefined
+                  ? 'Feriados'
+                  : ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][schedule.dayOfWeek],
                 open: new Date(schedule.openingTime).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
                 close: new Date(schedule.closingTime).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
               }))}
