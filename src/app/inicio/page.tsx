@@ -6,6 +6,8 @@ import { Header } from '../ui/Header';
 import { ReservationDetailsPopup } from '../ui/ReservationDetailsPopup';
 import { LoginModal } from '../ui/LoginModal';
 import { useCart } from '../ui/CartContext';
+import { toZonedTime } from 'date-fns-tz';
+import { format } from 'date-fns';
 
 type Sport = {
   id: string;
@@ -99,6 +101,17 @@ export default function Home() {
     }
   };
 
+  // Function to obtener la fecha local en formato YYYY-MM-DD (sin desfase UTC)
+  function getLocalDateString(date: Date) {
+    // Si la fecha fue creada con new Date('YYYY-MM-DD'), JS la interpreta como UTC.
+    // Para obtener la fecha local real, hay que crearla con new Date(year, month-1, day)
+    // y formatear así:
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
   // Function to fetch latest sports data and generate availability
   const updateAvailability = async () => {
     try {
@@ -113,10 +126,18 @@ export default function Home() {
         return `${hour.toString().padStart(2, '0')}:00`;
       });
 
+      // Siempre crear la base localmente, nunca con string
+      const base = selectedDate
+        ? (() => {
+            const [year, month, day] = selectedDate.split('-').map(Number);
+            return new Date(year, month - 1, day, 12, 0, 0, 0); // 12:00 para evitar problemas de horario de verano
+          })()
+        : new Date();
+
       for (let i = 0; i < 7; i++) {
-        const date = new Date(selectedDate);
-        date.setDate(date.getDate() + i);
-        const dateString = date.toISOString().split('T')[0];
+        const date = new Date(base);
+        date.setDate(base.getDate() + i);
+        const dateString = getLocalDateString(date);
         newAvailability[dateString] = {};
 
         const sport = sportsWithFacilities.find((s: Sport) => s.id === selectedSport);
@@ -130,7 +151,6 @@ export default function Home() {
               // Convertir block.startTime a horario local antes de comparar
               const isBlocked = blocks.some((block: any) => {
                 const blockStart = new Date(block.startTime);
-                // Convertir a horario local
                 const localHour = blockStart.getHours().toString().padStart(2, '0');
                 const localMinute = blockStart.getMinutes().toString().padStart(2, '0');
                 const localTimeStr = `${localHour}:${localMinute}`;
@@ -163,34 +183,38 @@ export default function Home() {
   }, [selectedSport, selectedDate]);
 
   const handlePreviousDay = () => {
-    if (!selectedDate) return; // Add this check
-    const currentDate = new Date(selectedDate);
-    const previousDate = new Date(currentDate);
-    previousDate.setDate(currentDate.getDate() - 1);
-    const previousDateString = previousDate.toISOString().split('T')[0];
-    
-    if (previousDate >= new Date(new Date().setHours(0, 0, 0, 0))) {
+    if (!selectedDate) return;
+    const [year, month, day] = selectedDate.split('-').map(Number);
+    const currentDate = new Date(year, month - 1, day, 12, 0, 0, 0);
+    currentDate.setDate(currentDate.getDate() - 1);
+    const previousDateString = getLocalDateString(currentDate);
+
+    const today = getLocalDateString(new Date());
+    if (previousDateString >= today) {
       setSelectedDate(previousDateString);
     }
   };
 
   const handleNextDay = () => {
-    if (!selectedDate) return; // Add this check
-    const currentDate = new Date(selectedDate);
-    const nextDate = new Date(currentDate);
-    nextDate.setDate(currentDate.getDate() + 1);
-    const nextDateString = nextDate.toISOString().split('T')[0];
-    
+    if (!selectedDate) return;
+    const [year, month, day] = selectedDate.split('-').map(Number);
+    const currentDate = new Date(year, month - 1, day, 12, 0, 0, 0);
+    currentDate.setDate(currentDate.getDate() + 1);
+    const nextDateString = getLocalDateString(currentDate);
+
     const maxDate = new Date();
     maxDate.setDate(maxDate.getDate() + 7);
-    if (nextDate <= maxDate) {
+    const maxDateString = getLocalDateString(maxDate);
+    if (nextDateString <= maxDateString) {
       setSelectedDate(nextDateString);
     }
   };
 
   const formatDate = (dateString: string) => {
     if (!dateString) return '';
-    const date = new Date(dateString);
+    const [year, month, day] = dateString.split('-').map(Number);
+    // ¡OJO! El mes es base 0 en JS
+    const date = new Date(year, month - 1, day);
     return date.toLocaleDateString('es-ES', { 
       weekday: 'long', 
       day: 'numeric', 
@@ -205,12 +229,13 @@ export default function Home() {
 
   const weekDates = useMemo(() => {
     if (!selectedDate) return [];
-    const start = new Date(selectedDate);
+    const [year, month, day] = selectedDate.split('-').map(Number);
+    const start = new Date(year, month - 1, day, 12, 0, 0, 0);
     const dates = [];
     for (let i = 0; i < 7; i++) {
       const date = new Date(start);
       date.setDate(start.getDate() + i);
-      dates.push(date.toISOString().split('T')[0]);
+      dates.push(getLocalDateString(date));
     }
     return dates;
   }, [selectedDate]);
@@ -366,13 +391,17 @@ export default function Home() {
               sports={sports.map(s => s.name)}
               services={location.services}
               images={['/canchas1.jpg', '/canchas2.jpg', '/canchas3.jpg']}
-              hours={location.schedules.map(schedule => ({
-                day: schedule.dayOfWeek === 7 || schedule.dayOfWeek === undefined
-                  ? 'Feriados'
-                  : ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][schedule.dayOfWeek],
-                open: new Date(schedule.openingTime).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-                close: new Date(schedule.closingTime).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
-              }))}
+              hours={location.schedules.map(schedule => {
+                const localOpening = new Date(schedule.openingTime);
+                const localClosing = new Date(schedule.closingTime);
+                return {
+                  day: schedule.dayOfWeek === 7 || schedule.dayOfWeek === undefined
+                    ? 'Feriados'
+                    : ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][schedule.dayOfWeek],
+                  open: format(localOpening, 'HH:mm'),
+                  close: format(localClosing, 'HH:mm')
+                };
+              })}
             />
           </div>
         </div>
