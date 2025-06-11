@@ -1,18 +1,18 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Toast } from "../../ui/Toast";
 
-const deportes = ["Fútbol 5", "Fútbol 7", "Tenis", "Pádel", "Basket", "Voley"];
+const diasSemana = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
 function ReglasHorarios({ reglas, setReglas }: { reglas: any[]; setReglas: (r: any[]) => void }) {
-  const diasSemana = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
-  const [nueva, setNueva] = useState({ dia: "Todos", apertura: "08:00", cierre: "23:00" });
+  const [nueva, setNueva] = useState({ dia: "Todos", apertura: "08:00", cierre: "23:00", duracion: 60 });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setNueva({ ...nueva, [e.target.name]: e.target.value });
   };
   const agregarRegla = () => {
     setReglas([...reglas, { ...nueva, id: Date.now() }]);
-    setNueva({ dia: "Todos", apertura: "08:00", cierre: "23:00" });
+    setNueva({ dia: "Todos", apertura: "08:00", cierre: "23:00", duracion: 60 });
   };
   const eliminarRegla = (id: number) => {
     setReglas(reglas.filter(r => r.id !== id));
@@ -26,6 +26,7 @@ function ReglasHorarios({ reglas, setReglas }: { reglas: any[]; setReglas: (r: a
             <th>Día de semana</th>
             <th>Apertura</th>
             <th>Cierre</th>
+            <th>Duración (min)</th>
             <th></th>
           </tr>
         </thead>
@@ -35,6 +36,7 @@ function ReglasHorarios({ reglas, setReglas }: { reglas: any[]; setReglas: (r: a
               <td className="py-2">{regla.dia}</td>
               <td>{regla.apertura}</td>
               <td>{regla.cierre}</td>
+              <td>{regla.duracion}</td>
               <td>
                 <button onClick={() => eliminarRegla(regla.id)} className="text-red-500 hover:underline ml-2">Eliminar</button>
               </td>
@@ -60,6 +62,10 @@ function ReglasHorarios({ reglas, setReglas }: { reglas: any[]; setReglas: (r: a
           <label className="block text-[#426a5a] font-semibold mb-1">Cierre</label>
           <input type="time" name="cierre" value={nueva.cierre} onChange={handleChange} className="rounded-lg border-[#7fb685] px-3 py-2" />
         </div>
+        <div>
+          <label className="block text-[#426a5a] font-semibold mb-1">Duración</label>
+          <input type="number" name="duracion" min={15} step={5} value={nueva.duracion} onChange={handleChange} className="rounded-lg border-[#7fb685] px-3 py-2 w-24" />
+        </div>
         <button onClick={agregarRegla} className="bg-[#426a5a] text-white font-bold px-6 py-2 rounded-lg shadow hover:bg-[#7fb685] transition-colors">Agregar regla</button>
       </div>
     </div>
@@ -67,37 +73,150 @@ function ReglasHorarios({ reglas, setReglas }: { reglas: any[]; setReglas: (r: a
 }
 
 export default function CanchaHorariosAdmin() {
-  const [canchas, setCanchas] = useState([
-    { id: 1, nombre: "Cancha 1", precio: 8000, deporte: "Fútbol 5", descripcion: "Cancha techada", reglas: [{ id: 1, dia: "Todos", apertura: "08:00", cierre: "23:00" }] },
-    { id: 2, nombre: "Cancha 2", precio: 6500, deporte: "Tenis", descripcion: "Superficie rápida", reglas: [{ id: 2, dia: "Lunes", apertura: "09:00", cierre: "22:00" }] },
-  ]);
-  const [selected, setSelected] = useState<number|null>(null);
-  const [nuevo, setNuevo] = useState({ nombre: "", precio: 0, deporte: deportes[0], descripcion: "", reglas: [] });
+  const [sedes, setSedes] = useState<any[]>([]);
+  const [selectedSede, setSelectedSede] = useState<string>("");
+  const [canchas, setCanchas] = useState<any[]>([]);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [nuevo, setNuevo] = useState({ nombre: "", precio: 0, deporte: "", descripcion: "", reglas: [] });
+  const [toast, setToast] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
+
+  // Cargar sedes al inicio
+  useEffect(() => {
+    fetch("/api/locations")
+      .then(res => res.json())
+      .then(data => {
+        setSedes(data);
+        if (data.length > 0) setSelectedSede(data[0].id);
+      });
+  }, []);
+
+  // Cargar canchas de la sede seleccionada
+  useEffect(() => {
+    if (!selectedSede) return;
+    fetch(`/api/facilities?locationId=${selectedSede}`)
+      .then(res => res.json())
+      .then(data => {
+        // Asegura que cada cancha tenga los campos requeridos
+        setCanchas(
+          data.map((c: any) => ({
+            ...c,
+            nombre: c.nombre ?? c.name ?? "",
+            precio: c.precio ?? c.price ?? 0,
+            deporte: c.deporte ?? c.sport?.name ?? "",
+            descripcion: c.descripcion ?? c.description ?? "",
+            reglas: c.reglas ?? [],
+          }))
+        );
+      });
+  }, [selectedSede]);
 
   // Edición de cancha seleccionada
   const cancha = canchas.find(c => c.id === selected);
+
+  // Handlers CRUD
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     if (!cancha) return;
     setCanchas(canchas.map(c => c.id === cancha.id ? { ...c, [e.target.name]: e.target.value } : c));
   };
-  // Reglas de horarios para la cancha seleccionada
+
   const setReglas = (reglas: any[]) => {
     if (!cancha) return;
     setCanchas(canchas.map(c => c.id === cancha.id ? { ...c, reglas } : c));
   };
-  // Agregar/eliminar cancha
-  const agregarCancha = () => {
-    setCanchas([...canchas, { ...nuevo, id: Date.now(), reglas: [] }]);
-    setNuevo({ nombre: "", precio: 0, deporte: deportes[0], descripcion: "", reglas: [] });
+
+  const agregarCancha = async () => {
+    if (!nuevo.nombre || !nuevo.deporte) {
+      setToast({ open: true, message: "Completa todos los campos" });
+      return;
+    }
+    const res = await fetch("/api/facilities", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: nuevo.nombre,
+        price: Number(nuevo.precio),
+        sportName: nuevo.deporte,
+        description: nuevo.descripcion,
+        locationId: selectedSede,
+        reglas: nuevo.reglas,
+      }),
+    });
+    if (res.ok) {
+      setToast({ open: true, message: "Cancha agregada" });
+      const data = await res.json();
+      setCanchas([...canchas, data]);
+      setNuevo({ nombre: "", precio: 0, deporte: "", descripcion: "", reglas: [] });
+    } else {
+      setToast({ open: true, message: "Error al agregar cancha" });
+    }
   };
-  const eliminarCancha = (id: number) => {
-    setCanchas(canchas.filter(c => c.id !== id));
-    if (selected === id) setSelected(null);
+
+  const eliminarCancha = async (id: string) => {
+    const res = await fetch(`/api/facilities/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      setCanchas(canchas.filter(c => c.id !== id));
+      setSelected(null);
+      setToast({ open: true, message: "Cancha eliminada" });
+    } else {
+      setToast({ open: true, message: "Error al eliminar cancha" });
+    }
+  };
+
+  const guardarCancha = async () => {
+    if (!cancha) return;
+    // Guardar Facility
+    const res = await fetch(`/api/facilities/${cancha.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: cancha.nombre,
+        price: Number(cancha.precio),
+        sportName: cancha.deporte,
+        description: cancha.descripcion,
+        reglas: cancha.reglas,
+      }),
+    });
+    if (res.ok) {
+      // Guardar reglas en FacilityAvailability
+      for (const regla of cancha.reglas) {
+        // Determinar dayOfWeek (0=Domingo, 1=Lunes, ...)
+        let dayOfWeek: number | null = null;
+        if (regla.dia === "Todos") dayOfWeek = null;
+        else dayOfWeek = diasSemana.indexOf(regla.dia) + 1; // Lunes=1, ..., Domingo=7
+        await fetch("/api/facility-availability", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            facilityId: cancha.id,
+            dayOfWeek,
+            openingTime: regla.apertura,
+            closingTime: regla.cierre,
+            slotDuration: Number(regla.duracion),
+          }),
+        });
+      }
+      setToast({ open: true, message: "Cancha actualizada" });
+    } else {
+      setToast({ open: true, message: "Error al actualizar cancha" });
+    }
   };
 
   return (
     <div className="max-w-5xl mx-auto py-10">
       <h1 className="text-3xl font-bold text-[#426a5a] mb-8">Gestión de canchas</h1>
+      {/* Selector de sede */}
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-[#426a5a] mb-2">Seleccionar Sede</label>
+        <select
+          className="w-full p-2 border rounded-md"
+          value={selectedSede}
+          onChange={e => { setSelectedSede(e.target.value); setSelected(null); }}
+        >
+          {sedes.map(sede => (
+            <option key={sede.id} value={sede.id}>{sede.name}</option>
+          ))}
+        </select>
+      </div>
       <div className="flex gap-8">
         {/* Panel izquierdo: lista de canchas */}
         <div className="w-1/3 bg-white/90 rounded-2xl shadow-xl p-6">
@@ -105,7 +224,7 @@ export default function CanchaHorariosAdmin() {
           <ul className="mb-4">
             {canchas.map(c => (
               <li key={c.id} className={`flex items-center justify-between mb-2 ${selected === c.id ? 'bg-[#f2c57c]/40' : ''} rounded-lg px-2 py-1`}>
-                <button onClick={() => setSelected(c.id)} className="text-left flex-1 text-[#426a5a] font-semibold">{c.nombre}</button>
+                <button onClick={() => setSelected(c.id)} className="text-left flex-1 text-[#426a5a] font-semibold">{c.name}</button>
                 <button onClick={() => eliminarCancha(c.id)} className="ml-2 text-red-500 hover:underline">Eliminar</button>
               </li>
             ))}
@@ -115,7 +234,14 @@ export default function CanchaHorariosAdmin() {
             <input type="text" name="nombre" placeholder="Nombre" value={nuevo.nombre} onChange={e => setNuevo({ ...nuevo, nombre: e.target.value })} className="mb-2 w-full rounded-lg border-[#7fb685] px-3 py-2" />
             <input type="number" name="precio" placeholder="Precio" value={nuevo.precio} onChange={e => setNuevo({ ...nuevo, precio: Number(e.target.value) })} className="mb-2 w-full rounded-lg border-[#7fb685] px-3 py-2" />
             <select name="deporte" value={nuevo.deporte} onChange={e => setNuevo({ ...nuevo, deporte: e.target.value })} className="mb-2 w-full rounded-lg border-[#7fb685] px-3 py-2">
-              {deportes.map(dep => <option key={dep} value={dep}>{dep}</option>)}
+              <option value="">Seleccionar deporte</option>
+              {/* Puedes cargar deportes desde la API si lo deseas */}
+              <option value="Fútbol 5">Fútbol 5</option>
+              <option value="Fútbol 7">Fútbol 7</option>
+              <option value="Tenis">Tenis</option>
+              <option value="Pádel">Pádel</option>
+              <option value="Basket">Basket</option>
+              <option value="Voley">Voley</option>
             </select>
             <textarea name="descripcion" placeholder="Descripción" value={nuevo.descripcion} onChange={e => setNuevo({ ...nuevo, descripcion: e.target.value })} className="mb-2 w-full rounded-lg border-[#7fb685] px-3 py-2" />
             <button onClick={agregarCancha} className="w-full bg-[#426a5a] text-white font-bold py-2 rounded-lg shadow hover:bg-[#7fb685] transition-colors">Agregar cancha</button>
@@ -129,30 +255,62 @@ export default function CanchaHorariosAdmin() {
               <div className="mb-4 grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[#426a5a] font-semibold mb-1">Nombre</label>
-                  <input type="text" name="nombre" value={cancha.nombre} onChange={handleChange} className="w-full rounded-lg border-[#7fb685] px-3 py-2" />
+                  <input
+                    type="text"
+                    name="nombre"
+                    value={cancha.nombre ?? ""}
+                    onChange={handleChange}
+                    className="w-full rounded-lg border-[#7fb685] px-3 py-2"
+                  />
                 </div>
                 <div>
                   <label className="block text-[#426a5a] font-semibold mb-1">Precio</label>
-                  <input type="number" name="precio" value={cancha.precio} onChange={handleChange} className="w-full rounded-lg border-[#7fb685] px-3 py-2" />
+                  <input
+                    type="number"
+                    name="precio"
+                    value={cancha.precio ?? 0}
+                    onChange={handleChange}
+                    className="w-full rounded-lg border-[#7fb685] px-3 py-2"
+                  />
                 </div>
                 <div>
                   <label className="block text-[#426a5a] font-semibold mb-1">Deporte</label>
-                  <select name="deporte" value={cancha.deporte} onChange={handleChange} className="w-full rounded-lg border-[#7fb685] px-3 py-2">
-                    {deportes.map(dep => <option key={dep} value={dep}>{dep}</option>)}
+                  <select
+                    name="deporte"
+                    value={cancha.deporte ?? ""}
+                    onChange={handleChange}
+                    className="w-full rounded-lg border-[#7fb685] px-3 py-2"
+                  >
+                    <option value="">Seleccionar deporte</option>
+                    <option value="Fútbol 5">Fútbol 5</option>
+                    <option value="Fútbol 7">Fútbol 7</option>
+                    <option value="Tenis">Tenis</option>
+                    <option value="Pádel">Pádel</option>
+                    <option value="Basket">Basket</option>
+                    <option value="Voley">Voley</option>
                   </select>
                 </div>
                 <div className="col-span-2">
                   <label className="block text-[#426a5a] font-semibold mb-1">Descripción</label>
-                  <textarea name="descripcion" value={cancha.descripcion} onChange={handleChange} className="w-full rounded-lg border-[#7fb685] px-3 py-2" />
+                  <textarea
+                    name="descripcion"
+                    value={cancha.descripcion ?? ""}
+                    onChange={handleChange}
+                    className="w-full rounded-lg border-[#7fb685] px-3 py-2"
+                  />
                 </div>
               </div>
-              <ReglasHorarios reglas={cancha.reglas} setReglas={setReglas} />
+              <ReglasHorarios reglas={cancha.reglas || []} setReglas={setReglas} />
+              <div className="flex justify-end">
+                <button onClick={guardarCancha} className="bg-[#426a5a] text-white font-bold px-6 py-2 rounded-lg shadow hover:bg-[#7fb685] transition-colors">Guardar cambios</button>
+              </div>
             </div>
           ) : (
             <div className="text-[#426a5a] text-lg">Selecciona una cancha para editar sus datos y reglas de horarios.</div>
           )}
         </div>
       </div>
+      <Toast open={toast.open} message={toast.message} onClose={() => setToast({ ...toast, open: false })} />
     </div>
   );
-} 
+}
