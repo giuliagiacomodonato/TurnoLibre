@@ -17,6 +17,7 @@ export async function GET(request: Request) {
         sport: true,
         location: true,
         schedules: true,
+        availability: true,
       },
       orderBy: { name: 'asc' },
     });

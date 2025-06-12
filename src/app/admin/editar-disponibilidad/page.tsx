@@ -30,6 +30,20 @@ type Availability = {
   };
 };
 
+// Auxiliar para obtener fecha local YYYY-MM-DD
+function getLocalDateString(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+// Auxiliar para obtener minutos desde medianoche local
+function getMinutesFromTimeString(time: string) {
+  const [h, m] = time.split(':').map(Number);
+  return h * 60 + m;
+}
+
 export default function EditarDisponibilidad() {
   const router = useRouter();
   const [facilities, setFacilities] = useState<Facility[]>([]);
@@ -64,7 +78,7 @@ export default function EditarDisponibilidad() {
 
   useEffect(() => {
     if (selectedFacility) {
-      setSelectedDate(new Date().toISOString().split('T')[0]);
+      setSelectedDate(getLocalDateString(new Date()));
       generateAvailability();
     }
   }, [selectedFacility]);
@@ -76,10 +90,14 @@ export default function EditarDisponibilidad() {
       return `${hour.toString().padStart(2, '0')}:00`;
     });
 
+    // Usar selectedDate como base local a las 12:00
+    const [year, month, day] = selectedDate.split('-').map(Number);
+    const base = new Date(year, month - 1, day);
+    base.setHours(12, 0, 0, 0);
     for (let i = 0; i < 7; i++) {
-      const date = new Date();
-      date.setDate(date.getDate() + i);
-      const dateString = date.toISOString().split('T')[0];
+      const date = new Date(base);
+      date.setDate(base.getDate() + i);
+      const dateString = getLocalDateString(date);
       newAvailability[dateString] = {};
 
       try {
@@ -90,11 +108,12 @@ export default function EditarDisponibilidad() {
           time,
           available: !blocks.some((block: Reservation) => {
             const blockStart = new Date(block.startTime);
-            // Convertir a horario local
-            const localHour = blockStart.getHours().toString().padStart(2, '0');
-            const localMinute = blockStart.getMinutes().toString().padStart(2, '0');
-            const localTimeStr = `${localHour}:${localMinute}`;
-            return localTimeStr === time;
+            // Convertir a local
+            const blockHour = blockStart.getHours();
+            const blockMinute = blockStart.getMinutes();
+            const blockMinutes = blockHour * 60 + blockMinute;
+            const slotMinutes = getMinutesFromTimeString(time);
+            return blockMinutes === slotMinutes;
           })
         }));
       } catch (error) {
@@ -107,24 +126,20 @@ export default function EditarDisponibilidad() {
 
   const handlePreviousDay = () => {
     const currentDate = new Date(selectedDate);
-    const previousDate = new Date(currentDate);
-    previousDate.setDate(currentDate.getDate() - 1);
-    const previousDateString = previousDate.toISOString().split('T')[0];
-    
-    if (previousDate >= new Date(new Date().setHours(0, 0, 0, 0))) {
+    currentDate.setDate(currentDate.getDate() - 1);
+    const previousDateString = getLocalDateString(currentDate);
+    if (previousDateString >= getLocalDateString(new Date())) {
       setSelectedDate(previousDateString);
     }
   };
 
   const handleNextDay = () => {
     const currentDate = new Date(selectedDate);
-    const nextDate = new Date(currentDate);
-    nextDate.setDate(currentDate.getDate() + 1);
-    const nextDateString = nextDate.toISOString().split('T')[0];
-    
+    currentDate.setDate(currentDate.getDate() + 1);
+    const nextDateString = getLocalDateString(currentDate);
     const maxDate = new Date();
     maxDate.setDate(maxDate.getDate() + 7);
-    if (nextDate <= maxDate) {
+    if (nextDateString <= getLocalDateString(maxDate)) {
       setSelectedDate(nextDateString);
     }
   };

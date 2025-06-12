@@ -25,6 +25,7 @@ type Facility = {
   locationId: string;
   location: Location;
   reservations: Reservation[];
+  availability: AvailabilitySlot[];
 };
 
 type Location = {
@@ -60,6 +61,12 @@ type Availability = {
       available: boolean;
     }[];
   };
+};
+
+type AvailabilitySlot = {
+  time: string;
+  available: boolean;
+  slotDuration: number;
 };
 
 export default function Home() {
@@ -129,15 +136,18 @@ export default function Home() {
     });
   }, [selectedLocationId, locations]);
 
-  // Function to obtener la fecha local en formato YYYY-MM-DD (sin desfase UTC)
+  // Auxiliar para obtener fecha local YYYY-MM-DD
   function getLocalDateString(date: Date) {
-    // Si la fecha fue creada con new Date('YYYY-MM-DD'), JS la interpreta como UTC.
-    // Para obtener la fecha local real, hay que crearla con new Date(year, month-1, day)
-    // y formatear así:
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  }
+
+  // Auxiliar para obtener minutos desde medianoche local
+  function getMinutesFromTimeString(time: string) {
+    const [h, m] = time.split(':').map(Number);
+    return h * 60 + m;
   }
 
   // Function to fetch latest sports data and generate availability
@@ -178,13 +188,14 @@ export default function Home() {
             const blocks = await blocksRes.json();
 
             newAvailability[dateString][facility.id] = timeSlots.map(time => {
-              // Convertir block.startTime a horario local antes de comparar
+              const slotMinutes = getMinutesFromTimeString(time);
               const isBlocked = blocks.some((block: any) => {
                 const blockStart = new Date(block.startTime);
-                const localHour = blockStart.getHours().toString().padStart(2, '0');
-                const localMinute = blockStart.getMinutes().toString().padStart(2, '0');
-                const localTimeStr = `${localHour}:${localMinute}`;
-                return localTimeStr === time;
+                // Convertir a local
+                const blockHour = blockStart.getHours();
+                const blockMinute = blockStart.getMinutes();
+                const blockMinutes = blockHour * 60 + blockMinute;
+                return blockMinutes === slotMinutes;
               });
               return {
                 time,
@@ -215,10 +226,9 @@ export default function Home() {
   const handlePreviousDay = () => {
     if (!selectedDate) return;
     const [year, month, day] = selectedDate.split('-').map(Number);
-    const currentDate = new Date(year, month - 1, day, 12, 0, 0, 0);
+    const currentDate = new Date(year, month - 1, day);
     currentDate.setDate(currentDate.getDate() - 1);
     const previousDateString = getLocalDateString(currentDate);
-
     const today = getLocalDateString(new Date());
     if (previousDateString >= today) {
       setSelectedDate(previousDateString);
@@ -228,10 +238,9 @@ export default function Home() {
   const handleNextDay = () => {
     if (!selectedDate) return;
     const [year, month, day] = selectedDate.split('-').map(Number);
-    const currentDate = new Date(year, month - 1, day, 12, 0, 0, 0);
+    const currentDate = new Date(year, month - 1, day);
     currentDate.setDate(currentDate.getDate() + 1);
     const nextDateString = getLocalDateString(currentDate);
-
     const maxDate = new Date();
     maxDate.setDate(maxDate.getDate() + 7);
     const maxDateString = getLocalDateString(maxDate);
@@ -304,6 +313,22 @@ export default function Home() {
   const selectedFacilityDetails = selectedSlot
     ? filteredFacilities.find(facility => facility.id === selectedSlot.facilityId)
     : null;
+
+  // Encuentra el slotDuration real para el turno seleccionado
+  const getSlotDurationForSelected = () => {
+    if (!selectedSlot || !selectedFacilityDetails) return 60;
+    // Buscar en availability del facility el slotDuration correspondiente al día y hora
+    // Suponemos que availability es un array de objetos con dayOfWeek, openingTime, closingTime, slotDuration
+    const facilityAvailabilities = selectedFacilityDetails.availability;
+    if (!facilityAvailabilities || facilityAvailabilities.length === 0) return 60;
+    // Obtener el día de la semana del selectedDate (0=Domingo, 1=Lunes...)
+    const [year, month, day] = selectedDate.split('-').map(Number);
+    const dateObj = new Date(year, month - 1, day);
+    const dayOfWeek = dateObj.getDay();
+    // Buscar la availability que coincida con el día
+    const found = facilityAvailabilities.find((a: any) => a.dayOfWeek === dayOfWeek);
+    return found?.slotDuration || facilityAvailabilities[0].slotDuration || 60;
+  };
 
   if (!location) {
     return <div>Cargando...</div>;
@@ -465,10 +490,12 @@ export default function Home() {
         <ReservationDetailsPopup
           courtName={selectedFacilityDetails.name}
           time={selectedSlot.time}
-          duration={60}
+          duration={getSlotDurationForSelected()}
           price={selectedFacilityDetails.price}
           onReserve={handleReserve}
           onClose={handleClosePopup}
+          courtDescription={selectedFacilityDetails.description || undefined}
+          venueAddress={selectedFacilityDetails.location?.address || undefined}
         />
       )}
 
