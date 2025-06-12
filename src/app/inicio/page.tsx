@@ -64,7 +64,9 @@ type Availability = {
 
 export default function Home() {
   const [sports, setSports] = useState<Sport[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [location, setLocation] = useState<Location | null>(null);
+  const [selectedLocationId, setSelectedLocationId] = useState<string>('');
   const [selectedSport, setSelectedSport] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedSlot, setSelectedSlot] = useState<{ facilityId: string; time: string; } | null>(null);
@@ -74,20 +76,28 @@ export default function Home() {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
 
-  // Function to fetch initial data (sports and location)
+  // Function to fetch initial data (sports and locations)
   const fetchInitialData = async () => {
     try {
-      const [sportsRes, locationRes] = await Promise.all([
+      const [sportsRes, locationsRes] = await Promise.all([
         fetch('/api/sports'),
-        fetch('/api/location')
+        fetch('/api/locations')
       ]);
 
       const sportsData = await sportsRes.json();
-      const locationData = await locationRes.json();
+      const locationsData = await locationsRes.json();
 
-      const sportsWithFacilities = sportsData.filter((sport: Sport) => sport.facilities.length > 0);
+      setLocations(locationsData);
+      // Seleccionar la primera sede por defecto
+      const initialLocation = locationsData[0] || null;
+      setLocation(initialLocation);
+      setSelectedLocationId(initialLocation?.id || '');
+
+      // Filtrar deportes por la sede seleccionada
+      const sportsWithFacilities = sportsData.filter((sport: Sport) =>
+        sport.facilities.some((f: Facility) => f.locationId === initialLocation?.id)
+      );
       setSports(sportsWithFacilities);
-      setLocation(locationData);
 
       // Inicializar selectedDate si no está seteado
       if (!selectedDate) {
@@ -100,6 +110,24 @@ export default function Home() {
       console.error('Error fetching initial data:', error);
     }
   };
+
+  // Cuando cambia la sede seleccionada, actualizar deportes y location
+  useEffect(() => {
+    if (!selectedLocationId || locations.length === 0) return;
+    const newLocation = locations.find(l => l.id === selectedLocationId) || null;
+    setLocation(newLocation);
+    fetch('/api/sports').then(res => res.json()).then(sportsData => {
+      const sportsWithFacilities = sportsData.filter((sport: Sport) =>
+        sport.facilities.some((f: Facility) => f.locationId === selectedLocationId)
+      );
+      setSports(sportsWithFacilities);
+      if (sportsWithFacilities.length > 0) {
+        setSelectedSport(sportsWithFacilities[0].id);
+      } else {
+        setSelectedSport('');
+      }
+    });
+  }, [selectedLocationId, locations]);
 
   // Function to obtener la fecha local en formato YYYY-MM-DD (sin desfase UTC)
   function getLocalDateString(date: Date) {
@@ -117,7 +145,9 @@ export default function Home() {
     try {
       const sportsRes = await fetch('/api/sports');
       const sportsData = await sportsRes.json();
-      const sportsWithFacilities: Sport[] = sportsData.filter((sport: Sport) => sport.facilities.length > 0);
+      const sportsWithFacilities: Sport[] = sportsData.filter((sport: Sport) =>
+        sport.facilities.some((f: Facility) => f.locationId === selectedLocationId)
+      );
       setSports(sportsWithFacilities);
 
       const newAvailability: Availability = {};
@@ -142,7 +172,7 @@ export default function Home() {
 
         const sport = sportsWithFacilities.find((s: Sport) => s.id === selectedSport);
         if (sport) {
-          for (const facility of sport.facilities) {
+          for (const facility of sport.facilities.filter(f => f.locationId === selectedLocationId)) {
             // Consultar slots bloqueados desde la API
             const blocksRes = await fetch(`/api/availability/blocks?date=${dateString}&facilityId=${facility.id}`);
             const blocks = await blocksRes.json();
@@ -224,8 +254,8 @@ export default function Home() {
 
   const filteredFacilities = useMemo(() => {
     const sport = sports.find(s => s.id === selectedSport);
-    return sport?.facilities || [];
-  }, [selectedSport, sports]);
+    return sport?.facilities.filter(f => f.locationId === selectedLocationId) || [];
+  }, [selectedSport, sports, selectedLocationId]);
 
   const weekDates = useMemo(() => {
     if (!selectedDate) return [];
@@ -382,27 +412,43 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Venue Info */}
-            <VenueInfo
-              name={location.name}
-              description={location.description || ''}
-              address={location.address}
-              phone={location.phone}
-              sports={sports.map(s => s.name)}
-              services={location.services}
-              images={['/canchas1.jpg', '/canchas2.jpg', '/canchas3.jpg']}
-              hours={location.schedules.map(schedule => {
-                const localOpening = new Date(schedule.openingTime);
-                const localClosing = new Date(schedule.closingTime);
-                return {
-                  day: schedule.dayOfWeek === 7 || schedule.dayOfWeek === undefined
-                    ? 'Feriados'
-                    : ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][schedule.dayOfWeek],
-                  open: format(localOpening, 'HH:mm'),
-                  close: format(localClosing, 'HH:mm')
-                };
-              })}
-            />
+            {/* Galería e info de sede */}
+            <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-6 mb-8">
+              {/* Selector de sede arriba de la galería/info */}
+              <div className="mb-6">
+                <label htmlFor="sede-select" className="block text-[#426a5a] font-bold mb-2">Seleccionar sede:</label>
+                <select
+                  id="sede-select"
+                  value={selectedLocationId}
+                  onChange={e => setSelectedLocationId(e.target.value)}
+                  className="w-full p-2 rounded-lg border border-[#7fb685] focus:outline-none focus:ring-2 focus:ring-[#7fb685]"
+                >
+                  {locations.map(loc => (
+                    <option key={loc.id} value={loc.id}>{loc.name}</option>
+                  ))}
+                </select>
+              </div>
+              <VenueInfo
+                name={location.name}
+                description={location.description || ''}
+                address={location.address}
+                phone={location.phone}
+                sports={sports.map(s => s.name)}
+                services={location.services}
+                images={['/canchas1.jpg', '/canchas2.jpg', '/canchas3.jpg']}
+                hours={location.schedules.map(schedule => {
+                  const localOpening = new Date(schedule.openingTime);
+                  const localClosing = new Date(schedule.closingTime);
+                  return {
+                    day: schedule.dayOfWeek === 7 || schedule.dayOfWeek === undefined
+                      ? 'Feriados'
+                      : ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][schedule.dayOfWeek],
+                    open: format(localOpening, 'HH:mm'),
+                    close: format(localClosing, 'HH:mm')
+                  };
+                })}
+              />
+            </div>
           </div>
         </div>
       </main>

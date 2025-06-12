@@ -18,6 +18,13 @@ interface VenueInfoProps {
 }
 
 export function VenueInfo({ name, description, address, phone, sports, images, hours, services }: VenueInfoProps) {
+  // Ordenar los horarios: lunes (1) a domingo (0 o 6), luego feriados
+  const diasOrden = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo', 'Feriados'];
+  const sortedHours = [...hours].sort((a, b) => {
+    const idxA = diasOrden.indexOf(a.day);
+    const idxB = diasOrden.indexOf(b.day);
+    return idxA - idxB;
+  });
   return (
     <div className="space-y-8">
       {/* Imágenes del complejo */}
@@ -38,7 +45,7 @@ export function VenueInfo({ name, description, address, phone, sports, images, h
 
       {/* Componentes de ubicación, horarios y servicios */}
       <VenueLocation address={address} phone={phone} />
-      <VenueHours hours={hours} />
+      <VenueHours hours={sortedHours} />
       <VenueServices services={services} />
     </div>
   );
