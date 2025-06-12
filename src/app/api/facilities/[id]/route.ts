@@ -1,9 +1,12 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(
+  request: NextRequest,
+  context: { params: { id: string } }
+) {
   try {
-    const id = params.id;
+    const id = context.params.id;
     const body = await request.json();
     const { name, price, sportName, description, reglas } = body;
 
@@ -32,17 +35,26 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     return NextResponse.json(updated);
   } catch (error) {
     console.error('Error al actualizar instalación:', error);
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Error interno del servidor' },
+      { status: 500 }
+    );
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(
+  request: NextRequest,
+  context: { params: { id: string } }
+) {
   try {
-    const id = params.id;
+    const id = context.params.id;
     await prisma.facility.delete({ where: { id } });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error al eliminar instalación:', error);
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Error interno del servidor' },
+      { status: 500 }
+    );
   }
 }

@@ -8,32 +8,43 @@ interface ScheduleInput {
   closingTime: string;
 }
 
-export async function PUT(request: NextRequest) {
+export async function PUT(
+  request: NextRequest,
+  context: { params: { id: string } }
+) {
   try {
-    const id = request.nextUrl.pathname.split('/').pop();
-
-    if (!id) {
-      return NextResponse.json({ error: 'ID no encontrado en la URL' }, { status: 400 });
-    }
-
+    const id = context.params.id;
     const { name, address, phone, description, services, schedules } = await request.json();
 
-    console.log('Received data:', { name, address, phone, description, services, schedules });
+    if (!name || !address || !phone) {
+      return NextResponse.json(
+        { error: 'Faltan campos requeridos (name, address, phone)' },
+        { status: 400 }
+      );
+    }
 
     const validSchedules = schedules.map((schedule: ScheduleInput) => {
-      const openingTime = new Date(schedule.openingTime);
-      const closingTime = new Date(schedule.closingTime);
+      try {
+        const openingTime = new Date(schedule.openingTime);
+        const closingTime = new Date(schedule.closingTime);
 
-      if (isNaN(openingTime.getTime()) || isNaN(closingTime.getTime())) {
-        throw new Error('Horarios inválidos');
+        if (isNaN(openingTime.getTime()) || isNaN(closingTime.getTime())) {
+          throw new Error('Horarios inválidos');
+        }
+
+        if (closingTime <= openingTime) {
+          throw new Error('La hora de cierre debe ser posterior a la hora de apertura');
+        }
+
+        return {
+          dayOfWeek: schedule.dayOfWeek,
+          isOpen: schedule.isOpen,
+          openingTime,
+          closingTime,
+        };
+      } catch (error) {
+        throw new Error(`Error en horario para día ${schedule.dayOfWeek}: ${error instanceof Error ? error.message : 'Horario inválido'}`);
       }
-
-      return {
-        dayOfWeek: schedule.dayOfWeek,
-        isOpen: schedule.isOpen,
-        openingTime,
-        closingTime,
-      };
     });
 
     const updatedLocation = await prisma.location.update({
@@ -54,14 +65,12 @@ export async function PUT(request: NextRequest) {
       },
     });
 
-    console.log('Updated location:', updatedLocation);
-
     return NextResponse.json(updatedLocation);
   } catch (error) {
     console.error('Error updating location:', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Error al actualizar la sede' },
-      { status: 500 }
+      { status: error instanceof Error && error.message.includes('inválido') ? 400 : 500 }
     );
   }
 }

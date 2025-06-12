@@ -1,7 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const locationId = searchParams.get('locationId');
@@ -25,15 +25,25 @@ export async function GET(request: Request) {
     return NextResponse.json(facilities);
   } catch (error) {
     console.error('Error al obtener instalaciones:', error);
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Error al obtener las instalaciones' },
+      { status: 500 }
+    );
   }
 }
 
 // POST: Crear nueva cancha
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { name, price, sportName, description, locationId, reglas } = body;
+
+    if (!name || !price || !sportName || !locationId) {
+      return NextResponse.json(
+        { error: 'Faltan campos requeridos (name, price, sportName, locationId)' },
+        { status: 400 }
+      );
+    }
 
     // Buscar el deporte por nombre
     const sport = await prisma.sport.findFirst({ where: { name: sportName } });
@@ -48,7 +58,6 @@ export async function POST(request: Request) {
         description,
         sportId: sport.id,
         locationId,
-        // Puedes guardar reglas como JSON o crear otra tabla si lo deseas
       },
       include: {
         sport: true,
@@ -60,6 +69,9 @@ export async function POST(request: Request) {
     return NextResponse.json(facility);
   } catch (error) {
     console.error('Error al crear instalación:', error);
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Error al crear la instalación' },
+      { status: 500 }
+    );
   }
 }

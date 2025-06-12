@@ -1,9 +1,16 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const { facilityId, dayOfWeek, openingTime, closingTime, slotDuration } = await request.json();
+
+    if (!facilityId || !openingTime || !closingTime || !slotDuration) {
+      return NextResponse.json(
+        { error: 'Faltan campos requeridos (facilityId, openingTime, closingTime, slotDuration)' },
+        { status: 400 }
+      );
+    }
 
     // Si el día es "Todos", crear/actualizar para cada día de la semana (0=Domingo ... 6=Sábado)
     const diasSemana = [0, 1, 2, 3, 4, 5, 6];
@@ -51,6 +58,9 @@ export async function POST(request: Request) {
     return NextResponse.json(results);
   } catch (error) {
     console.error('Error al guardar disponibilidad:', error);
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Error al guardar la disponibilidad' },
+      { status: 500 }
+    );
   }
 }

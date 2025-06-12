@@ -1,7 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const locations = await prisma.location.findMany({
       include: {
@@ -18,7 +18,7 @@ export async function GET() {
   } catch (error) {
     console.error('Error fetching locations:', error);
     return NextResponse.json(
-      { error: 'Error al obtener las sedes' },
+      { error: error instanceof Error ? error.message : 'Error al obtener las sedes' },
       { status: 500 }
     );
   }

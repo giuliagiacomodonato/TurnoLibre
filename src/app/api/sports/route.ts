@@ -1,7 +1,7 @@
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { NextResponse } from 'next/server';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const sports = await prisma.sport.findMany({
       include: {
@@ -22,6 +22,10 @@ export async function GET() {
     });
     return NextResponse.json(sports);
   } catch (error) {
-    return NextResponse.json({ error: 'Error fetching sports' }, { status: 500 });
+    console.error('Error fetching sports:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Error al obtener los deportes' },
+      { status: 500 }
+    );
   }
 } 

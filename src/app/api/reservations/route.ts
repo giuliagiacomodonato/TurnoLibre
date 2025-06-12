@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { toZonedTime } from 'date-fns-tz';
 import { parseISO } from 'date-fns';
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const deporteId = searchParams.get('deporte');
@@ -28,31 +28,45 @@ export async function GET(request: Request) {
     }
 
     if (fecha && fecha !== '') {
-      // Parse the date string first
-      const dateObj = parseISO(fecha);
-      const startOfDayUTC = toZonedTime(dateObj, timeZone);
-      const endOfDayUTC = toZonedTime(new Date(dateObj.setHours(23, 59, 59, 999)), timeZone);
-      
-      where.date = {
-        gte: startOfDayUTC,
-        lte: endOfDayUTC,
-      };
+      try {
+        // Parse the date string first
+        const dateObj = parseISO(fecha);
+        const startOfDayUTC = toZonedTime(dateObj, timeZone);
+        const endOfDayUTC = toZonedTime(new Date(dateObj.setHours(23, 59, 59, 999)), timeZone);
+        
+        where.date = {
+          gte: startOfDayUTC,
+          lte: endOfDayUTC,
+        };
+      } catch (error) {
+        return NextResponse.json(
+          { error: 'Formato de fecha inválido' },
+          { status: 400 }
+        );
+      }
     }
 
     if (hora && hora !== '') {
-      // Parse the date and time together
-      const baseDate = fecha || new Date().toISOString().split('T')[0];
-      const [hours] = hora.split(':');
-      const dateTimeStr = `${baseDate}T${hours}:00:00`;
-      const dateTimeObj = parseISO(dateTimeStr);
-      
-      const startTimeUTC = toZonedTime(dateTimeObj, timeZone);
-      const endTimeUTC = toZonedTime(new Date(dateTimeObj.setHours(Number(hours) + 1)), timeZone);
-      
-      where.startTime = {
-        gte: startTimeUTC,
-        lt: endTimeUTC,
-      };
+      try {
+        // Parse the date and time together
+        const baseDate = fecha || new Date().toISOString().split('T')[0];
+        const [hours] = hora.split(':');
+        const dateTimeStr = `${baseDate}T${hours}:00:00`;
+        const dateTimeObj = parseISO(dateTimeStr);
+        
+        const startTimeUTC = toZonedTime(dateTimeObj, timeZone);
+        const endTimeUTC = toZonedTime(new Date(dateTimeObj.setHours(Number(hours) + 1)), timeZone);
+        
+        where.startTime = {
+          gte: startTimeUTC,
+          lt: endTimeUTC,
+        };
+      } catch (error) {
+        return NextResponse.json(
+          { error: 'Formato de hora inválido' },
+          { status: 400 }
+        );
+      }
     }
 
     // Get total count for pagination
@@ -104,7 +118,7 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error('Error fetching reservations:', error);
     return NextResponse.json(
-      { error: 'Error al obtener las reservas' },
+      { error: error instanceof Error ? error.message : 'Error al obtener las reservas' },
       { status: 500 }
     );
   }
