@@ -8,18 +8,13 @@ interface ScheduleInput {
   closingTime: string;
 }
 
-type RouteContext = {
-  params: {
-    id: string;
-  };
-};
-
 export async function PUT(
   request: NextRequest,
-  { params }: RouteContext
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
+  
   try {
-    const id = params.id;
     const { name, address, phone, description, services, schedules } = await request.json();
 
     if (!name || !address || !phone) {
@@ -30,27 +25,22 @@ export async function PUT(
     }
 
     const validSchedules = schedules.map((schedule: ScheduleInput) => {
-      try {
-        const openingTime = new Date(schedule.openingTime);
-        const closingTime = new Date(schedule.closingTime);
+      const openingTime = new Date(schedule.openingTime);
+      const closingTime = new Date(schedule.closingTime);
 
-        if (isNaN(openingTime.getTime()) || isNaN(closingTime.getTime())) {
-          throw new Error('Horarios inválidos');
-        }
-
-        if (closingTime <= openingTime) {
-          throw new Error('La hora de cierre debe ser posterior a la hora de apertura');
-        }
-
-        return {
-          dayOfWeek: schedule.dayOfWeek,
-          isOpen: schedule.isOpen,
-          openingTime,
-          closingTime,
-        };
-      } catch (error) {
-        throw new Error(`Error en horario para día ${schedule.dayOfWeek}: ${error instanceof Error ? error.message : 'Horario inválido'}`);
+      if (isNaN(openingTime.getTime()) || isNaN(closingTime.getTime())) {
+        throw new Error(`Error en horario para día ${schedule.dayOfWeek}: Horarios inválidos`);
       }
+      if (closingTime <= openingTime) {
+        throw new Error(`Error en horario para día ${schedule.dayOfWeek}: La hora de cierre debe ser posterior a la hora de apertura`);
+      }
+
+      return {
+        dayOfWeek: schedule.dayOfWeek,
+        isOpen: schedule.isOpen,
+        openingTime,
+        closingTime,
+      };
     });
 
     const updatedLocation = await prisma.location.update({
@@ -74,26 +64,24 @@ export async function PUT(
     return NextResponse.json(updatedLocation);
   } catch (error) {
     console.error('Error updating location:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Error al actualizar la sede' },
-      { status: error instanceof Error && error.message.includes('inválido') ? 400 : 500 }
-    );
+    const message = error instanceof Error ? error.message : 'Error al actualizar la sede';
+    const status = message.includes('Horario') ? 400 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }
 
 export async function DELETE(
   request: NextRequest,
-  { params }: RouteContext
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
+
   try {
-    const id = params.id;
     await prisma.location.delete({ where: { id } });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error al eliminar sede:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Error al eliminar la sede' },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : 'Error al eliminar la sede';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
