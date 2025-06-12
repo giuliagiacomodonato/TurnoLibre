@@ -14,6 +14,13 @@ export async function GET(request: NextRequest) {
     const pageSize = 10;
     const skip = (page - 1) * pageSize;
 
+    if (page < 1) {
+      return NextResponse.json(
+        { error: 'El número de página debe ser mayor a 0' },
+        { status: 400 }
+      );
+    }
+
     const where: any = {};
     const timeZone = 'America/Argentina/Buenos_Aires';
 
@@ -40,7 +47,7 @@ export async function GET(request: NextRequest) {
         };
       } catch (error) {
         return NextResponse.json(
-          { error: 'Formato de fecha inválido' },
+          { error: 'Formato de fecha inválido. Use YYYY-MM-DD' },
           { status: 400 }
         );
       }
@@ -63,7 +70,7 @@ export async function GET(request: NextRequest) {
         };
       } catch (error) {
         return NextResponse.json(
-          { error: 'Formato de hora inválido' },
+          { error: 'Formato de hora inválido. Use HH:mm' },
           { status: 400 }
         );
       }
@@ -71,6 +78,18 @@ export async function GET(request: NextRequest) {
 
     // Get total count for pagination
     const totalCount = await prisma.reservation.count({ where });
+
+    if (totalCount === 0) {
+      return NextResponse.json({
+        reservations: [],
+        pagination: {
+          total: 0,
+          pageSize,
+          currentPage: page,
+          totalPages: 0
+        }
+      });
+    }
 
     const reservations = await prisma.reservation.findMany({
       where,
@@ -116,10 +135,10 @@ export async function GET(request: NextRequest) {
       }
     });
   } catch (error) {
-    console.error('Error fetching reservations:', error);
+    console.error('Error al obtener reservas:', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Error al obtener las reservas' },
-      { status: 500 }
+      { status: error instanceof Error && error.message.includes('inválido') ? 400 : 500 }
     );
   }
 } 

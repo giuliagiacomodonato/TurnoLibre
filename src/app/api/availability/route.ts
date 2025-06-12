@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { ReservationStatus } from '@prisma/client';
 
@@ -18,9 +18,9 @@ function validateDate(dateStr: string, fieldName: string) {
   return parsedDate;
 }
 
-export async function POST(req: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const { facilityId, date, startTime, endTime, isBlocked } = await req.json();
+    const { facilityId, date, startTime, endTime, isBlocked } = await request.json();
 
     // Validate required fields
     if (!facilityId || !date || !startTime || !endTime) {
@@ -85,13 +85,16 @@ export async function POST(req: Request) {
   }
 }
 
-export async function DELETE(req: Request) {
+export async function DELETE(request: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
     if (!id) {
-      return NextResponse.json({ error: 'ID no proporcionado' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'ID no proporcionado' },
+        { status: 400 }
+      );
     }
 
     await prisma.reservation.delete({
@@ -101,6 +104,9 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error al eliminar bloque de disponibilidad:', error);
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Error interno del servidor' },
+      { status: 500 }
+    );
   }
 }

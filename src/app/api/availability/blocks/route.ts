@@ -1,14 +1,17 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-export async function GET(req: Request) {
+export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = new URL(request.url);
     const date = searchParams.get('date');
     const facilityId = searchParams.get('facilityId');
 
     if (!date || !facilityId) {
-      return NextResponse.json({ error: 'Parámetros requeridos' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Parámetros requeridos (date, facilityId)' },
+        { status: 400 }
+      );
     }
 
     // Validate date format (YYYY-MM-DD)
@@ -49,7 +52,7 @@ export async function GET(req: Request) {
     console.error('Error al obtener bloques de disponibilidad:', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Error interno del servidor' },
-      { status: 500 }
+      { status: error instanceof Error && error.message.includes('inválido') ? 400 : 500 }
     );
   }
 } 

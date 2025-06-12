@@ -8,12 +8,18 @@ interface ScheduleInput {
   closingTime: string;
 }
 
+type RouteContext = {
+  params: {
+    id: string;
+  };
+};
+
 export async function PUT(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: RouteContext
 ) {
   try {
-    const id = context.params.id;
+    const id = params.id;
     const { name, address, phone, description, services, schedules } = await request.json();
 
     if (!name || !address || !phone) {
@@ -71,6 +77,23 @@ export async function PUT(
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Error al actualizar la sede' },
       { status: error instanceof Error && error.message.includes('inválido') ? 400 : 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: RouteContext
+) {
+  try {
+    const id = params.id;
+    await prisma.location.delete({ where: { id } });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error al eliminar sede:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Error al eliminar la sede' },
+      { status: 500 }
     );
   }
 }
