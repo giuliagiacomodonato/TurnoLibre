@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
 interface ScheduleInput {
@@ -8,22 +8,22 @@ interface ScheduleInput {
   closingTime: string;
 }
 
-export async function PUT(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(request: NextRequest) {
   try {
+    const id = request.nextUrl.pathname.split('/').pop();
+
+    if (!id) {
+      return NextResponse.json({ error: 'ID no encontrado en la URL' }, { status: 400 });
+    }
+
     const { name, address, phone, description, services, schedules } = await request.json();
-    const locationId = params.id;
 
     console.log('Received data:', { name, address, phone, description, services, schedules });
 
-    // Validar que los horarios sean válidos
     const validSchedules = schedules.map((schedule: ScheduleInput) => {
       const openingTime = new Date(schedule.openingTime);
       const closingTime = new Date(schedule.closingTime);
 
-      // Asegurarse de que las fechas sean válidas
       if (isNaN(openingTime.getTime()) || isNaN(closingTime.getTime())) {
         throw new Error('Horarios inválidos');
       }
@@ -32,13 +32,12 @@ export async function PUT(
         dayOfWeek: schedule.dayOfWeek,
         isOpen: schedule.isOpen,
         openingTime,
-        closingTime
+        closingTime,
       };
     });
 
-    // Actualizar información general y servicios
     const updatedLocation = await prisma.location.update({
-      where: { id: locationId },
+      where: { id },
       data: {
         name,
         address,
@@ -46,13 +45,8 @@ export async function PUT(
         description,
         services,
         schedules: {
-          deleteMany: {}, // Eliminar todos los horarios existentes
-          create: validSchedules.map((schedule: { dayOfWeek: number; isOpen: boolean; openingTime: Date; closingTime: Date }) => ({
-            dayOfWeek: schedule.dayOfWeek,
-            isOpen: schedule.isOpen,
-            openingTime: schedule.openingTime,
-            closingTime: schedule.closingTime,
-          })),
+          deleteMany: {},
+          create: validSchedules,
         },
       },
       include: {
@@ -70,4 +64,4 @@ export async function PUT(
       { status: 500 }
     );
   }
-} 
+}

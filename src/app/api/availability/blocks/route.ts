@@ -11,10 +11,28 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Parámetros requeridos' }, { status: 400 });
     }
 
+    // Validate date format (YYYY-MM-DD)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(date)) {
+      return NextResponse.json(
+        { error: 'Formato de fecha inválido. Use YYYY-MM-DD' },
+        { status: 400 }
+      );
+    }
+
+    // Create date object and validate it's a valid date
+    const parsedDate = new Date(date);
+    if (isNaN(parsedDate.getTime())) {
+      return NextResponse.json(
+        { error: 'Fecha inválida' },
+        { status: 400 }
+      );
+    }
+
     const blocks = await prisma.reservation.findMany({
       where: {
         facilityId,
-        date: new Date(date),
+        date: parsedDate,
         status: 'BLOCKED',
       },
       include: {
@@ -29,6 +47,9 @@ export async function GET(req: Request) {
     return NextResponse.json(blocks);
   } catch (error) {
     console.error('Error al obtener bloques de disponibilidad:', error);
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Error interno del servidor' },
+      { status: 500 }
+    );
   }
 } 
