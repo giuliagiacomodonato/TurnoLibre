@@ -90,10 +90,9 @@ export default function EditarDisponibilidad() {
       return `${hour.toString().padStart(2, '0')}:00`;
     });
 
-    // Usar selectedDate como base local a las 12:00
+    // Usar selectedDate como base local a las 12:00 para evitar desfases
     const [year, month, day] = selectedDate.split('-').map(Number);
-    const base = new Date(year, month - 1, day);
-    base.setHours(12, 0, 0, 0);
+    const base = new Date(year, month - 1, day, 12, 0, 0, 0);
     for (let i = 0; i < 7; i++) {
       const date = new Date(base);
       date.setDate(base.getDate() + i);
@@ -102,7 +101,8 @@ export default function EditarDisponibilidad() {
 
       try {
         const res = await fetch(`/api/availability/blocks?date=${dateString}&facilityId=${selectedFacility}`);
-        const blocks = await res.json();
+        let blocks = await res.json();
+        if (!Array.isArray(blocks)) blocks = []; // Asegura que blocks siempre sea un array
 
         newAvailability[dateString][selectedFacility] = timeSlots.map(time => ({
           time,
@@ -118,6 +118,10 @@ export default function EditarDisponibilidad() {
         }));
       } catch (error) {
         console.error('Error fetching blocks:', error);
+        newAvailability[dateString][selectedFacility] = timeSlots.map(time => ({
+          time,
+          available: true
+        }));
       }
     }
 
@@ -125,7 +129,8 @@ export default function EditarDisponibilidad() {
   };
 
   const handlePreviousDay = () => {
-    const currentDate = new Date(selectedDate);
+    const [year, month, day] = selectedDate.split('-').map(Number);
+    const currentDate = new Date(year, month - 1, day, 12, 0, 0, 0);
     currentDate.setDate(currentDate.getDate() - 1);
     const previousDateString = getLocalDateString(currentDate);
     if (previousDateString >= getLocalDateString(new Date())) {
@@ -134,7 +139,8 @@ export default function EditarDisponibilidad() {
   };
 
   const handleNextDay = () => {
-    const currentDate = new Date(selectedDate);
+    const [year, month, day] = selectedDate.split('-').map(Number);
+    const currentDate = new Date(year, month - 1, day, 12, 0, 0, 0);
     currentDate.setDate(currentDate.getDate() + 1);
     const nextDateString = getLocalDateString(currentDate);
     const maxDate = new Date();
@@ -146,7 +152,8 @@ export default function EditarDisponibilidad() {
 
   const formatDate = (dateString: string) => {
     if (!dateString) return '';
-    const date = new Date(dateString);
+    const [year, month, day] = dateString.split('-').map(Number);
+    const date = new Date(year, month - 1, day, 12, 0, 0, 0);
     return date.toLocaleDateString('es-ES', { 
       weekday: 'long', 
       day: 'numeric', 
