@@ -10,6 +10,12 @@ type Facility = {
   sport: {
     name: string;
   };
+  availability?: {
+    dayOfWeek: number;
+    openingTime: string;
+    closingTime: string;
+    slotDuration: number;
+  }[];
 };
 
 type Reservation = {
@@ -42,6 +48,19 @@ function getLocalDateString(date: Date) {
 function getMinutesFromTimeString(time: string) {
   const [h, m] = time.split(':').map(Number);
   return h * 60 + m;
+}
+
+// Utilidad para convertir string UTC a Date local
+function utcToLocal(dateString: string) {
+  const utcDate = new Date(dateString);
+  return new Date(
+    utcDate.getUTCFullYear(),
+    utcDate.getUTCMonth(),
+    utcDate.getUTCDate(),
+    utcDate.getUTCHours(),
+    utcDate.getUTCMinutes(),
+    utcDate.getUTCSeconds()
+  );
 }
 
 export default function EditarDisponibilidad() {
@@ -83,12 +102,17 @@ export default function EditarDisponibilidad() {
     }
   }, [selectedFacility]);
 
+  useEffect(() => {
+    if (selectedFacility && selectedDate) {
+      generateAvailability();
+    }
+  }, [selectedFacility, selectedDate]);
+
   const generateAvailability = async () => {
     const newAvailability: Availability = {};
-    const timeSlots = Array.from({ length: 11 }, (_, i) => {
-      const hour = i + 13;
-      return `${hour.toString().padStart(2, '0')}:00`;
-    });
+    // Buscar la cancha seleccionada
+    const facility = facilities.find(f => f.id === selectedFacility);
+    if (!facility || !facility.availability) return;
 
     // Usar selectedDate como base local a las 12:00 para evitar desfases
     const [year, month, day] = selectedDate.split('-').map(Number);
@@ -99,21 +123,49 @@ export default function EditarDisponibilidad() {
       const dateString = getLocalDateString(date);
       newAvailability[dateString] = {};
 
+      // Obtener availability para ese día
+      const dayOfWeek = date.getDay();
+      const avail = (facility.availability || []).find((a) => a.dayOfWeek === dayOfWeek);
+      if (!avail) {
+        newAvailability[dateString][selectedFacility] = [];
+        continue;
+      }
+      const opening = utcToLocal(avail.openingTime);
+      const closing = utcToLocal(avail.closingTime);
+      const slotDuration = avail.slotDuration;
+      // Generar slots dinámicamente
+      const timeSlots: string[] = [];
+      let current = new Date(opening.getTime());
+      while (current < closing) {
+        timeSlots.push(current.toTimeString().slice(0,5));
+        current = new Date(current.getTime() + slotDuration * 60000);
+      }
+
       try {
         const res = await fetch(`/api/availability/blocks?date=${dateString}&facilityId=${selectedFacility}`);
         let blocks = await res.json();
-        if (!Array.isArray(blocks)) blocks = []; // Asegura que blocks siempre sea un array
+        if (!Array.isArray(blocks)) blocks = [];
+        // DEBUG: Log de bloques y slots
+        console.log('Bloques recibidos para', dateString, selectedFacility, (blocks as Reservation[]).map((b: Reservation) => ({startTime: b.startTime, status: b.status})));
+        console.log('Slots generados para', dateString, timeSlots);
 
         newAvailability[dateString][selectedFacility] = timeSlots.map(time => ({
           time,
           available: !blocks.some((block: Reservation) => {
-            const blockStart = new Date(block.startTime);
-            // Convertir a local
-            const blockHour = blockStart.getHours();
-            const blockMinute = blockStart.getMinutes();
-            const blockMinutes = blockHour * 60 + blockMinute;
-            const slotMinutes = getMinutesFromTimeString(time);
-            return blockMinutes === slotMinutes;
+            // Convertir block.startTime de UTC a local
+            const utcDate = new Date(block.startTime);
+            const blockLocal = new Date(
+              utcDate.getUTCFullYear(),
+              utcDate.getUTCMonth(),
+              utcDate.getUTCDate(),
+              utcDate.getUTCHours(),
+              utcDate.getUTCMinutes(),
+              utcDate.getUTCSeconds()
+            );
+            // Comparar fecha y hora local exacta (YYYY-MM-DD HH:mm)
+            const blockDateStr = `${blockLocal.getFullYear()}-${String(blockLocal.getMonth()+1).padStart(2,'0')}-${String(blockLocal.getDate()).padStart(2,'0')}`;
+            const blockTimeStr = blockLocal.toTimeString().slice(0,5);
+            return blockDateStr === dateString && blockTimeStr === time;
           })
         }));
       } catch (error) {
@@ -261,36 +313,74 @@ export default function EditarDisponibilidad() {
           {/* Timeline Grid */}
           <div className="overflow-x-auto">
             <div className="w-full min-w-[800px]">
-              {/* Time Headers */}
-              <div className="grid grid-cols-[200px_repeat(11,1fr)] gap-1 text-center mb-4">
+              {/* Time Headers dinámicos */}
+              <div className="grid grid-cols-[200px_repeat(36,1fr)] gap-1 text-center mb-4">
                 <div className="col-span-1 font-bold text-[#426a5a]">Horario</div>
-                {Array.from({ length: 11 }, (_, i) => {
-                  const hour = i + 13;
-                  return (
-                    <div key={hour} className="font-bold text-[#426a5a]">
-                      {`${hour.toString().padStart(2, '0')}:00`}
-                    </div>
-                  );
-                })}
+                {/* Obtener availability del facility seleccionado para el día */}
+                {(() => {
+                  const facility = facilities.find(f => f.id === selectedFacility);
+                  if (!facility || !facility.availability) return null;
+                  const [year, month, day] = selectedDate.split('-').map(Number);
+                  const dateObj = new Date(year, month - 1, day);
+                  const dayOfWeek = dateObj.getDay();
+                  const avail = (facility.availability || []).find((a) => a.dayOfWeek === dayOfWeek);
+                  if (!avail) return null;
+                  const opening = utcToLocal(avail.openingTime);
+                  const closing = utcToLocal(avail.closingTime);
+                  const slotDuration = avail.slotDuration;
+                  const headers = [];
+                  let current = new Date(opening.getTime());
+                  while (current < closing) {
+                    headers.push(current.toTimeString().slice(0,5));
+                    current = new Date(current.getTime() + slotDuration * 60000);
+                  }
+                  return headers.map(time => (
+                    <div key={time} className="font-bold text-[#426a5a]">{time}</div>
+                  ));
+                })()}
               </div>
-
-              {/* Time Slots */}
-              <div className="grid grid-cols-[200px_repeat(11,1fr)] gap-1 items-center">
+              {/* Time Slots dinámicos */}
+              <div className="grid grid-cols-[200px_repeat(36,1fr)] gap-1 items-center">
                 <div className="text-sm font-semibold text-[#426a5a] pr-2">
                   {facilities.find(f => f.id === selectedFacility)?.name}
                 </div>
-                {availability[selectedDate]?.[selectedFacility]?.map(slot => (
-                  <div
-                    key={slot.time}
-                    className={`h-8 rounded ${
-                      slot.available 
-                        ? 'bg-[#7fb685] hover:bg-[#426a5a] cursor-pointer' 
-                        : 'bg-gray-300 hover:bg-red-400 cursor-pointer'
-                    } transition-colors`}
-                    title={`${slot.time} - ${slot.available ? 'Disponible' : 'Bloqueado'}`}
-                    onClick={() => handleSlotClick(selectedFacility, slot.time, !slot.available)}
-                  />
-                ))}
+                {/* Renderizar los slots según availability */}
+                {(() => {
+                  const facility = facilities.find(f => f.id === selectedFacility);
+                  if (!facility || !facility.availability) return null;
+                  const [year, month, day] = selectedDate.split('-').map(Number);
+                  const dateObj = new Date(year, month - 1, day);
+                  const dayOfWeek = dateObj.getDay();
+                  const avail = (facility.availability || []).find((a) => a.dayOfWeek === dayOfWeek);
+                  if (!avail) return null;
+                  const opening = utcToLocal(avail.openingTime);
+                  const closing = utcToLocal(avail.closingTime);
+                  const slotDuration = avail.slotDuration;
+                  const slots = [];
+                  let current = new Date(opening.getTime());
+                  while (current < closing) {
+                    slots.push(current.toTimeString().slice(0,5));
+                    current = new Date(current.getTime() + slotDuration * 60000);
+                  }
+                  return slots.map(time => {
+                    const slotObj = availability[selectedDate]?.[selectedFacility]?.find(s => s.time === time);
+                    return (
+                      <div
+                        key={time}
+                        className={`h-12 w-16 rounded-lg mx-1 my-1 flex items-center justify-center text-sm font-semibold transition-colors \
+                          ${slotObj?.available 
+                            ? 'bg-[#7fb685] hover:bg-[#426a5a] cursor-pointer text-[#426a5a] hover:text-white' 
+                            : 'bg-gray-300 hover:bg-red-400 cursor-pointer text-gray-400'}
+                        `}
+                        style={{ minWidth: '4rem', minHeight: '3rem' }}
+                        title={`${time} - ${slotObj?.available ? 'Disponible' : 'Bloqueado'}`}
+                        onClick={() => handleSlotClick(selectedFacility, time, !(slotObj?.available))}
+                      >
+                        {/* Sin hora dentro del slot */}
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             </div>
           </div>
