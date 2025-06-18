@@ -149,25 +149,22 @@ export default function EditarDisponibilidad() {
         console.log('Bloques recibidos para', dateString, selectedFacility, (blocks as Reservation[]).map((b: Reservation) => ({startTime: b.startTime, status: b.status})));
         console.log('Slots generados para', dateString, timeSlots);
 
-        newAvailability[dateString][selectedFacility] = timeSlots.map(time => ({
-          time,
-          available: !blocks.some((block: Reservation) => {
-            // Convertir block.startTime de UTC a local
-            const utcDate = new Date(block.startTime);
-            const blockLocal = new Date(
-              utcDate.getUTCFullYear(),
-              utcDate.getUTCMonth(),
-              utcDate.getUTCDate(),
-              utcDate.getUTCHours(),
-              utcDate.getUTCMinutes(),
-              utcDate.getUTCSeconds()
-            );
-            // Comparar fecha y hora local exacta (YYYY-MM-DD HH:mm)
-            const blockDateStr = `${blockLocal.getFullYear()}-${String(blockLocal.getMonth()+1).padStart(2,'0')}-${String(blockLocal.getDate()).padStart(2,'0')}`;
-            const blockTimeStr = blockLocal.toTimeString().slice(0,5);
-            return blockDateStr === dateString && blockTimeStr === time;
-          })
-        }));
+        newAvailability[dateString][selectedFacility] = timeSlots.map(slot => {
+          const slotMinutes = getMinutesFromTimeString(slot);
+          const isBlocked = blocks.some((block: any) => {
+            // Solo considerar bloqueos con status BLOCKED
+            if (block.status !== "BLOCKED") return false;
+            const blockStart = new Date(block.startTime);
+            const blockHour = blockStart.getHours();
+            const blockMinute = blockStart.getMinutes();
+            const blockMinutes = blockHour * 60 + blockMinute;
+            return blockMinutes === slotMinutes;
+          });
+          return { 
+            time: slot,
+            available: !isBlocked 
+          };
+        });
       } catch (error) {
         console.error('Error fetching blocks:', error);
         newAvailability[dateString][selectedFacility] = timeSlots.map(time => ({
@@ -314,9 +311,8 @@ export default function EditarDisponibilidad() {
           <div className="overflow-x-auto">
             <div className="w-full min-w-[800px]">
               {/* Time Headers dinámicos */}
-              <div className="grid grid-cols-[200px_repeat(36,1fr)] gap-1 text-center mb-4">
+              <div className="grid grid-cols-[200px_repeat(36,minmax(4rem,1fr))] gap-1 text-center mb-4">
                 <div className="col-span-1 font-bold text-[#426a5a]">Horario</div>
-                {/* Obtener availability del facility seleccionado para el día */}
                 {(() => {
                   const facility = facilities.find(f => f.id === selectedFacility);
                   if (!facility || !facility.availability) return null;
@@ -335,16 +331,17 @@ export default function EditarDisponibilidad() {
                     current = new Date(current.getTime() + slotDuration * 60000);
                   }
                   return headers.map(time => (
-                    <div key={time} className="font-bold text-[#426a5a]">{time}</div>
+                    <div key={time} className="font-bold text-[#426a5a] w-full">
+                      {time}
+                    </div>
                   ));
                 })()}
               </div>
               {/* Time Slots dinámicos */}
-              <div className="grid grid-cols-[200px_repeat(36,1fr)] gap-1 items-center">
+              <div className="grid grid-cols-[200px_repeat(36,minmax(4rem,1fr))] gap-1 items-center">
                 <div className="text-sm font-semibold text-[#426a5a] pr-2">
                   {facilities.find(f => f.id === selectedFacility)?.name}
                 </div>
-                {/* Renderizar los slots según availability */}
                 {(() => {
                   const facility = facilities.find(f => f.id === selectedFacility);
                   if (!facility || !facility.availability) return null;
@@ -367,17 +364,15 @@ export default function EditarDisponibilidad() {
                     return (
                       <div
                         key={time}
-                        className={`h-12 w-16 rounded-lg mx-1 my-1 flex items-center justify-center text-sm font-semibold transition-colors \
+                        className={`h-12 rounded-lg flex items-center justify-center text-sm font-semibold transition-colors \
                           ${slotObj?.available 
                             ? 'bg-[#7fb685] hover:bg-[#426a5a] cursor-pointer text-[#426a5a] hover:text-white' 
                             : 'bg-gray-300 hover:bg-red-400 cursor-pointer text-gray-400'}
                         `}
-                        style={{ minWidth: '4rem', minHeight: '3rem' }}
+                        style={{ minWidth: '4rem' }}
                         title={`${time} - ${slotObj?.available ? 'Disponible' : 'Bloqueado'}`}
                         onClick={() => handleSlotClick(selectedFacility, time, !(slotObj?.available))}
-                      >
-                        {/* Sin hora dentro del slot */}
-                      </div>
+                      />
                     );
                   });
                 })()}
