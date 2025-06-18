@@ -5,14 +5,14 @@ import { Toast } from "../../ui/Toast";
 const diasSemana = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
 function ReglasHorarios({ reglas, setReglas }: { reglas: any[]; setReglas: (r: any[]) => void }) {
-  const [nueva, setNueva] = useState({ dia: "Todos", apertura: "08:00", cierre: "23:00", duracion: 60 });
+  const [nueva, setNueva] = useState({ dia: "Todos", apertura: "08:00", cierre: "23:00", duracion: "60" });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setNueva({ ...nueva, [e.target.name]: e.target.value });
   };
   const agregarRegla = () => {
-    setReglas([...reglas, { ...nueva, id: Date.now() }]);
-    setNueva({ dia: "Todos", apertura: "08:00", cierre: "23:00", duracion: 60 });
+    setReglas([...reglas, { ...nueva, duracion: nueva.duracion.toString(), id: Date.now() }]);
+    setNueva({ dia: "Todos", apertura: "08:00", cierre: "23:00", duracion: "60" });
   };
   const eliminarRegla = (id: number) => {
     setReglas(reglas.filter(r => r.id !== id));
@@ -36,7 +36,7 @@ function ReglasHorarios({ reglas, setReglas }: { reglas: any[]; setReglas: (r: a
               <td className="py-2">{regla.dia}</td>
               <td>{regla.apertura}</td>
               <td>{regla.cierre}</td>
-              <td>{regla.duracion}</td>
+              <td>{regla.duracion.toString()}</td>
               <td>
                 <button onClick={() => eliminarRegla(regla.id)} className="text-red-500 hover:underline ml-2">Eliminar</button>
               </td>
@@ -64,7 +64,10 @@ function ReglasHorarios({ reglas, setReglas }: { reglas: any[]; setReglas: (r: a
         </div>
         <div>
           <label className="block text-[#426a5a] font-semibold mb-1">Duración</label>
-          <input type="number" name="duracion" min={15} step={5} value={nueva.duracion} onChange={handleChange} className="rounded-lg border-[#7fb685] px-3 py-2 w-24" />
+          <select name="duracion" value={nueva.duracion} onChange={handleChange} className="rounded-lg border-[#7fb685] px-3 py-2 w-24">
+            <option value="60">60 min</option>
+            <option value="90">90 min</option>
+          </select>
         </div>
         <button onClick={agregarRegla} className="bg-[#426a5a] text-white font-bold px-6 py-2 rounded-lg shadow hover:bg-[#7fb685] transition-colors">Agregar regla</button>
       </div>
@@ -79,6 +82,7 @@ export default function CanchaHorariosAdmin() {
   const [selected, setSelected] = useState<string | null>(null);
   const [nuevo, setNuevo] = useState({ nombre: "", precio: 0, deporte: "", descripcion: "", reglas: [] });
   const [toast, setToast] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
+  const [sports, setSports] = useState<any[]>([]);
 
   // Cargar sedes al inicio
   useEffect(() => {
@@ -96,7 +100,6 @@ export default function CanchaHorariosAdmin() {
     fetch(`/api/facilities?locationId=${selectedSede}`)
       .then(res => res.json())
       .then(data => {
-        // Asegura que cada cancha tenga los campos requeridos
         setCanchas(
           data.map((c: any) => ({
             ...c,
@@ -104,11 +107,18 @@ export default function CanchaHorariosAdmin() {
             precio: c.precio ?? c.price ?? 0,
             deporte: c.deporte ?? c.sport?.name ?? "",
             descripcion: c.descripcion ?? c.description ?? "",
-            reglas: c.reglas ?? [],
+            reglas: (c.reglas ?? []).map((r: any) => ({ ...r, duracion: r.duracion?.toString?.() ?? "60" })),
           }))
         );
       });
   }, [selectedSede]);
+
+  // Cargar deportes al inicio
+  useEffect(() => {
+    fetch("/api/sports")
+      .then(res => res.json())
+      .then(data => setSports(data));
+  }, []);
 
   // Edición de cancha seleccionada
   const cancha = canchas.find(c => c.id === selected);
@@ -124,9 +134,20 @@ export default function CanchaHorariosAdmin() {
     setCanchas(canchas.map(c => c.id === cancha.id ? { ...c, reglas } : c));
   };
 
+  // Al crear o editar una cancha, busca el sportId a partir del nombre del deporte seleccionado
+  const getSportIdByName = (sports: any[], name: string) => {
+    const sport = sports.find(s => s.name === name);
+    return sport ? sport.id : null;
+  };
+
   const agregarCancha = async () => {
     if (!nuevo.nombre || !nuevo.deporte) {
       setToast({ open: true, message: "Completa todos los campos" });
+      return;
+    }
+    const sportId = getSportIdByName(sports, nuevo.deporte);
+    if (!sportId) {
+      setToast({ open: true, message: "Deporte no válido" });
       return;
     }
     const res = await fetch("/api/facilities", {
@@ -134,11 +155,10 @@ export default function CanchaHorariosAdmin() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: nuevo.nombre,
-        price: Number(nuevo.precio),
-        sportName: nuevo.deporte,
         description: nuevo.descripcion,
+        price: Number(nuevo.precio),
+        sportId,
         locationId: selectedSede,
-        reglas: nuevo.reglas,
       }),
     });
     if (res.ok) {
@@ -164,22 +184,25 @@ export default function CanchaHorariosAdmin() {
 
   const guardarCancha = async () => {
     if (!cancha) return;
-    // Guardar Facility
+    const sportId = getSportIdByName(sports, cancha.deporte);
+    if (!sportId) {
+      setToast({ open: true, message: "Deporte no válido" });
+      return;
+    }
     const res = await fetch(`/api/facilities/${cancha.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: cancha.nombre,
-        price: Number(cancha.precio),
-        sportName: cancha.deporte,
         description: cancha.descripcion,
-        reglas: cancha.reglas,
+        price: Number(cancha.precio),
+        sportId,
+        locationId: selectedSede,
       }),
     });
     if (res.ok) {
       // Guardar reglas en FacilityAvailability
       for (const regla of cancha.reglas) {
-        // Determinar dayOfWeek (0=Domingo, 1=Lunes, ...)
         let dayOfWeek: number | null = null;
         if (regla.dia === "Todos") dayOfWeek = null;
         else dayOfWeek = diasSemana.indexOf(regla.dia) + 1; // Lunes=1, ..., Domingo=7
@@ -197,6 +220,8 @@ export default function CanchaHorariosAdmin() {
       }
       setToast({ open: true, message: "Cancha actualizada" });
     } else {
+      const errorText = await res.text();
+      console.error("Error al actualizar cancha:", errorText);
       setToast({ open: true, message: "Error al actualizar cancha" });
     }
   };

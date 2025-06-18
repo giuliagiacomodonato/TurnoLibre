@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-interface ScheduleInput {
-  dayOfWeek: number;
-  isOpen: boolean;
-  openingTime: string;
-  closingTime: string;
-}
-
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -15,58 +8,31 @@ export async function PUT(
   const { id } = await params;
 
   try {
-    const { name, address, phone, description, services, schedules } = await request.json();
+    const { name, description, price, sportId, locationId } = await request.json();
 
-    if (!name || !address || !phone) {
+    if (!name || !price || !sportId || !locationId) {
       return NextResponse.json(
-        { error: 'Faltan campos requeridos (name, address, phone)' },
+        { error: 'Faltan campos requeridos (name, price, sportId, locationId)' },
         { status: 400 }
       );
     }
 
-    const validSchedules = schedules.map((schedule: ScheduleInput) => {
-      const openingTime = new Date(schedule.openingTime);
-      const closingTime = new Date(schedule.closingTime);
-
-      if (isNaN(openingTime.getTime()) || isNaN(closingTime.getTime())) {
-        throw new Error(`Error en horario para día ${schedule.dayOfWeek}: Horarios inválidos`);
-      }
-      if (closingTime <= openingTime) {
-        throw new Error(`Error en horario para día ${schedule.dayOfWeek}: La hora de cierre debe ser posterior a la hora de apertura`);
-      }
-
-      return {
-        dayOfWeek: schedule.dayOfWeek,
-        isOpen: schedule.isOpen,
-        openingTime,
-        closingTime,
-      };
-    });
-
-    const updatedLocation = await prisma.location.update({
+    const updatedFacility = await prisma.facility.update({
       where: { id },
       data: {
         name,
-        address,
-        phone,
         description,
-        services,
-        schedules: {
-          deleteMany: {},
-          create: validSchedules,
-        },
-      },
-      include: {
-        schedules: true,
+        price,
+        sportId,
+        locationId,
       },
     });
 
-    return NextResponse.json(updatedLocation);
+    return NextResponse.json(updatedFacility);
   } catch (error) {
-    console.error('Error updating location:', error);
-    const message = error instanceof Error ? error.message : 'Error al actualizar la sede';
-    const status = message.includes('Horario') ? 400 : 500;
-    return NextResponse.json({ error: message }, { status });
+    console.error('Error updating facility:', error);
+    const message = error instanceof Error ? error.message : 'Error al actualizar la cancha';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -77,11 +43,11 @@ export async function DELETE(
   const { id } = await params;
 
   try {
-    await prisma.location.delete({ where: { id } });
+    await prisma.facility.delete({ where: { id } });
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error al eliminar sede:', error);
-    const message = error instanceof Error ? error.message : 'Error al eliminar la sede';
+    console.error('Error al eliminar cancha:', error);
+    const message = error instanceof Error ? error.message : 'Error al eliminar la cancha';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
