@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from './ui/CartContext';
+import { SessionProvider } from "next-auth/react";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -24,9 +25,11 @@ export default function RootLayout({
         {/* Si existe /public/favicon.ico, reemplázalo por tu logo o elimínalo */}
       </head>
       <body className={`${inter.variable} font-sans antialiased`}>
-        <CartProvider>
-          {children}
-        </CartProvider>
+        <SessionProvider>
+          <CartProvider>
+            {children}
+          </CartProvider>
+        </SessionProvider>
       </body>
     </html>
   );

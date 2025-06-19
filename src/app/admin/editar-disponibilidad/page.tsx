@@ -1,8 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Header } from "@/app/ui/Header";
 import { Toast } from "@/app/ui/Toast";
+import { useSession } from "next-auth/react";
+import { AdminHeader } from "../../ui/Header";
 
 type Facility = {
   id: string;
@@ -64,6 +65,7 @@ function utcToLocal(dateString: string) {
 }
 
 export default function EditarDisponibilidad() {
+  const { data: session, status } = useSession();
   const router = useRouter();
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [selectedFacility, setSelectedFacility] = useState<string>("");
@@ -77,6 +79,17 @@ export default function EditarDisponibilidad() {
     time: string;
     isCurrentlyBlocked: boolean;
   }>({ open: false, facilityId: "", time: "", isCurrentlyBlocked: false });
+
+  useEffect(() => {
+    if (status === "loading") return;
+    if (!session || (session.user as any).role !== "ADMIN") {
+      router.replace("/");
+    }
+  }, [session, status, router]);
+
+  if (!session || (session.user as any).role !== "ADMIN") {
+    return null;
+  }
 
   useEffect(() => {
     const fetchFacilities = async () => {
@@ -256,162 +269,163 @@ export default function EditarDisponibilidad() {
   };
 
   return (
-    <div className="min-h-screen bg-[#426a5a]">
-      <Header />
-      
-      <main className="container mx-auto px-4 py-8">
-        <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-6">
-          <h1 className="text-2xl font-bold text-[#426a5a] mb-6">Editar Disponibilidad</h1>
+    <>
+      <AdminHeader />
+      <div className="min-h-screen bg-[#426a5a]">
+        <main className="container mx-auto px-4 py-8">
+          <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-6">
+            <h1 className="text-2xl font-bold text-[#426a5a] mb-6">Editar Disponibilidad</h1>
 
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-[#426a5a] mb-2">
-              Cancha
-            </label>
-            <select
-              value={selectedFacility}
-              onChange={(e) => setSelectedFacility(e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#426a5a] focus:border-transparent"
-            >
-              {facilities.map((facility) => (
-                <option key={facility.id} value={facility.id}>
-                  {facility.name} - {facility.sport.name}
-                </option>
-              ))}
-            </select>
-          </div>
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-[#426a5a] mb-2">
+                Cancha
+              </label>
+              <select
+                value={selectedFacility}
+                onChange={(e) => setSelectedFacility(e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#426a5a] focus:border-transparent"
+              >
+                {facilities.map((facility) => (
+                  <option key={facility.id} value={facility.id}>
+                    {facility.name} - {facility.sport.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          {/* Date Selector */}
-          <div className="mb-6 flex items-center justify-between">
-            <button
-              onClick={handlePreviousDay}
-              className="p-2 rounded-lg hover:bg-[#7fb685]/20 transition-colors"
-              title="Día anterior"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-[#426a5a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            
-            <h2 className="text-xl font-bold text-[#426a5a] capitalize">
-              {formatDate(selectedDate)}
-            </h2>
+            {/* Date Selector */}
+            <div className="mb-6 flex items-center justify-between">
+              <button
+                onClick={handlePreviousDay}
+                className="p-2 rounded-lg hover:bg-[#7fb685]/20 transition-colors"
+                title="Día anterior"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-[#426a5a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              
+              <h2 className="text-xl font-bold text-[#426a5a] capitalize">
+                {formatDate(selectedDate)}
+              </h2>
 
-            <button
-              onClick={handleNextDay}
-              className="p-2 rounded-lg hover:bg-[#7fb685]/20 transition-colors"
-              title="Día siguiente"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-[#426a5a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          </div>
+              <button
+                onClick={handleNextDay}
+                className="p-2 rounded-lg hover:bg-[#7fb685]/20 transition-colors"
+                title="Día siguiente"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-[#426a5a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
 
-          {/* Timeline Grid */}
-          <div className="overflow-x-auto">
-            <div className="w-full min-w-[800px]">
-              {/* Time Headers dinámicos */}
-              <div className="grid grid-cols-[200px_repeat(36,minmax(4rem,1fr))] gap-1 text-center mb-4">
-                <div className="col-span-1 font-bold text-[#426a5a]">Horario</div>
-                {(() => {
-                  const facility = facilities.find(f => f.id === selectedFacility);
-                  if (!facility || !facility.availability) return null;
-                  const [year, month, day] = selectedDate.split('-').map(Number);
-                  const dateObj = new Date(year, month - 1, day);
-                  const dayOfWeek = dateObj.getDay();
-                  const avail = (facility.availability || []).find((a) => a.dayOfWeek === dayOfWeek);
-                  if (!avail) return null;
-                  const opening = utcToLocal(avail.openingTime);
-                  const closing = utcToLocal(avail.closingTime);
-                  const slotDuration = avail.slotDuration;
-                  const headers = [];
-                  let current = new Date(opening.getTime());
-                  while (current < closing) {
-                    headers.push(current.toTimeString().slice(0,5));
-                    current = new Date(current.getTime() + slotDuration * 60000);
-                  }
-                  return headers.map(time => (
-                    <div key={time} className="font-bold text-[#426a5a] w-full">
-                      {time}
-                    </div>
-                  ));
-                })()}
-              </div>
-              {/* Time Slots dinámicos */}
-              <div className="grid grid-cols-[200px_repeat(36,minmax(4rem,1fr))] gap-1 items-center">
-                <div className="text-sm font-semibold text-[#426a5a] pr-2">
-                  {facilities.find(f => f.id === selectedFacility)?.name}
+            {/* Timeline Grid */}
+            <div className="overflow-x-auto">
+              <div className="w-full min-w-[800px]">
+                {/* Time Headers dinámicos */}
+                <div className="grid grid-cols-[200px_repeat(36,minmax(4rem,1fr))] gap-1 text-center mb-4">
+                  <div className="col-span-1 font-bold text-[#426a5a]">Horario</div>
+                  {(() => {
+                    const facility = facilities.find(f => f.id === selectedFacility);
+                    if (!facility || !facility.availability) return null;
+                    const [year, month, day] = selectedDate.split('-').map(Number);
+                    const dateObj = new Date(year, month - 1, day);
+                    const dayOfWeek = dateObj.getDay();
+                    const avail = (facility.availability || []).find((a) => a.dayOfWeek === dayOfWeek);
+                    if (!avail) return null;
+                    const opening = utcToLocal(avail.openingTime);
+                    const closing = utcToLocal(avail.closingTime);
+                    const slotDuration = avail.slotDuration;
+                    const headers = [];
+                    let current = new Date(opening.getTime());
+                    while (current < closing) {
+                      headers.push(current.toTimeString().slice(0,5));
+                      current = new Date(current.getTime() + slotDuration * 60000);
+                    }
+                    return headers.map(time => (
+                      <div key={time} className="font-bold text-[#426a5a] w-full">
+                        {time}
+                      </div>
+                    ));
+                  })()}
                 </div>
-                {(() => {
-                  const facility = facilities.find(f => f.id === selectedFacility);
-                  if (!facility || !facility.availability) return null;
-                  const [year, month, day] = selectedDate.split('-').map(Number);
-                  const dateObj = new Date(year, month - 1, day);
-                  const dayOfWeek = dateObj.getDay();
-                  const avail = (facility.availability || []).find((a) => a.dayOfWeek === dayOfWeek);
-                  if (!avail) return null;
-                  const opening = utcToLocal(avail.openingTime);
-                  const closing = utcToLocal(avail.closingTime);
-                  const slotDuration = avail.slotDuration;
-                  const slots = [];
-                  let current = new Date(opening.getTime());
-                  while (current < closing) {
-                    slots.push(current.toTimeString().slice(0,5));
-                    current = new Date(current.getTime() + slotDuration * 60000);
-                  }
-                  return slots.map(time => {
-                    const slotObj = availability[selectedDate]?.[selectedFacility]?.find(s => s.time === time);
-                    return (
-                      <div
-                        key={time}
-                        className={`h-12 rounded-lg flex items-center justify-center text-sm font-semibold transition-colors \
-                          ${slotObj?.available 
-                            ? 'bg-[#7fb685] hover:bg-[#426a5a] cursor-pointer text-[#426a5a] hover:text-white' 
-                            : 'bg-gray-300 hover:bg-red-400 cursor-pointer text-gray-400'}
-                        `}
-                        style={{ minWidth: '4rem' }}
-                        title={`${time} - ${slotObj?.available ? 'Disponible' : 'Bloqueado'}`}
-                        onClick={() => handleSlotClick(selectedFacility, time, !(slotObj?.available))}
-                      />
-                    );
-                  });
-                })()}
+                {/* Time Slots dinámicos */}
+                <div className="grid grid-cols-[200px_repeat(36,minmax(4rem,1fr))] gap-1 items-center">
+                  <div className="text-sm font-semibold text-[#426a5a] pr-2">
+                    {facilities.find(f => f.id === selectedFacility)?.name}
+                  </div>
+                  {(() => {
+                    const facility = facilities.find(f => f.id === selectedFacility);
+                    if (!facility || !facility.availability) return null;
+                    const [year, month, day] = selectedDate.split('-').map(Number);
+                    const dateObj = new Date(year, month - 1, day);
+                    const dayOfWeek = dateObj.getDay();
+                    const avail = (facility.availability || []).find((a) => a.dayOfWeek === dayOfWeek);
+                    if (!avail) return null;
+                    const opening = utcToLocal(avail.openingTime);
+                    const closing = utcToLocal(avail.closingTime);
+                    const slotDuration = avail.slotDuration;
+                    const slots = [];
+                    let current = new Date(opening.getTime());
+                    while (current < closing) {
+                      slots.push(current.toTimeString().slice(0,5));
+                      current = new Date(current.getTime() + slotDuration * 60000);
+                    }
+                    return slots.map(time => {
+                      const slotObj = availability[selectedDate]?.[selectedFacility]?.find(s => s.time === time);
+                      return (
+                        <div
+                          key={time}
+                          className={`h-12 rounded-lg flex items-center justify-center text-sm font-semibold transition-colors \
+                            ${slotObj?.available 
+                              ? 'bg-[#7fb685] hover:bg-[#426a5a] cursor-pointer text-[#426a5a] hover:text-white' 
+                              : 'bg-gray-300 hover:bg-red-400 cursor-pointer text-gray-400'}
+                          `}
+                          style={{ minWidth: '4rem' }}
+                          title={`${time} - ${slotObj?.available ? 'Disponible' : 'Bloqueado'}`}
+                          onClick={() => handleSlotClick(selectedFacility, time, !(slotObj?.available))}
+                        />
+                      );
+                    });
+                  })()}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </main>
-      {/* Modal de confirmación */}
-      {confirmModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-lg shadow-xl p-8 max-w-xs w-full flex flex-col items-center">
-            <h3 className="text-lg font-bold text-[#426a5a] mb-4 text-center">Confirmar acción</h3>
-            <p className="mb-6 text-[#426a5a] text-center">
-              ¿Estás seguro de que quieres {confirmModal.isCurrentlyBlocked ? 'desbloquear' : 'bloquear'} el horario <b>{confirmModal.time}</b>?
-            </p>
-            <div className="flex justify-center gap-2 w-full">
-              <button
-                className="px-4 py-2 rounded bg-gray-200 text-[#426a5a] hover:bg-gray-300"
-                onClick={() => setConfirmModal({ open: false, facilityId: "", time: "", isCurrentlyBlocked: false })}
-              >
-                Cancelar
-              </button>
-              <button
-                className={`px-4 py-2 rounded font-bold ${
-                  confirmModal.isCurrentlyBlocked
-                    ? 'bg-red-500 text-white hover:bg-red-600'
-                    : 'bg-[#7fb685] text-white hover:bg-[#426a5a]'
-                }`}
-                onClick={handleConfirm}
-              >
-                Confirmar
-              </button>
+        </main>
+        {/* Modal de confirmación */}
+        {confirmModal.open && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div className="bg-white rounded-lg shadow-xl p-8 max-w-xs w-full flex flex-col items-center">
+              <h3 className="text-lg font-bold text-[#426a5a] mb-4 text-center">Confirmar acción</h3>
+              <p className="mb-6 text-[#426a5a] text-center">
+                ¿Estás seguro de que quieres {confirmModal.isCurrentlyBlocked ? 'desbloquear' : 'bloquear'} el horario <b>{confirmModal.time}</b>?
+              </p>
+              <div className="flex justify-center gap-2 w-full">
+                <button
+                  className="px-4 py-2 rounded bg-gray-200 text-[#426a5a] hover:bg-gray-300"
+                  onClick={() => setConfirmModal({ open: false, facilityId: "", time: "", isCurrentlyBlocked: false })}
+                >
+                  Cancelar
+                </button>
+                <button
+                  className={`px-4 py-2 rounded font-bold ${
+                    confirmModal.isCurrentlyBlocked
+                      ? 'bg-red-500 text-white hover:bg-red-600'
+                      : 'bg-[#7fb685] text-white hover:bg-[#426a5a]'
+                  }`}
+                  onClick={handleConfirm}
+                >
+                  Confirmar
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-      {/* Toast de confirmación */}
-      <Toast open={showToast} message={toastMessage || ""} onClose={() => setShowToast(false)} />
-    </div>
+        )}
+        {/* Toast de confirmación */}
+        <Toast open={showToast} message={toastMessage || ""} onClose={() => setShowToast(false)} />
+      </div>
+    </>
   );
 }

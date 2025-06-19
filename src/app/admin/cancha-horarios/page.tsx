@@ -1,6 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
 import { Toast } from "../../ui/Toast";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { AdminHeader } from "../../ui/Header";
 
 const diasSemana = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
@@ -76,6 +79,20 @@ function ReglasHorarios({ reglas, setReglas }: { reglas: any[]; setReglas: (r: a
 }
 
 export default function CanchaHorariosAdmin() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (status === "loading") return;
+    if (!session || (session.user as any).role !== "ADMIN") {
+      router.replace("/");
+    }
+  }, [session, status, router]);
+
+  if (!session || (session.user as any).role !== "ADMIN") {
+    return null;
+  }
+
   const [sedes, setSedes] = useState<any[]>([]);
   const [selectedSede, setSelectedSede] = useState<string>("");
   const [canchas, setCanchas] = useState<any[]>([]);
@@ -227,115 +244,118 @@ export default function CanchaHorariosAdmin() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto py-10">
-      <h1 className="text-3xl font-bold text-[#426a5a] mb-8">Gestión de canchas</h1>
-      {/* Selector de sede */}
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-[#426a5a] mb-2">Seleccionar Sede</label>
-        <select
-          className="w-full p-2 border rounded-md"
-          value={selectedSede}
-          onChange={e => { setSelectedSede(e.target.value); setSelected(null); }}
-        >
-          {sedes.map(sede => (
-            <option key={sede.id} value={sede.id}>{sede.name}</option>
-          ))}
-        </select>
-      </div>
-      <div className="flex gap-8">
-        {/* Panel izquierdo: lista de canchas */}
-        <div className="w-1/3 bg-white/90 rounded-2xl shadow-xl p-6">
-          <h2 className="text-xl font-bold text-[#426a5a] mb-4">Canchas del complejo</h2>
-          <ul className="mb-4">
-            {canchas.map(c => (
-              <li key={c.id} className={`flex items-center justify-between mb-2 ${selected === c.id ? 'bg-[#f2c57c]/40' : ''} rounded-lg px-2 py-1`}>
-                <button onClick={() => setSelected(c.id)} className="text-left flex-1 text-[#426a5a] font-semibold">{c.name}</button>
-                <button onClick={() => eliminarCancha(c.id)} className="ml-2 text-red-500 hover:underline">Eliminar</button>
-              </li>
+    <>
+      <AdminHeader />
+      <div className="max-w-5xl mx-auto py-10">
+        <h1 className="text-3xl font-bold text-[#426a5a] mb-8">Gestión de canchas</h1>
+        {/* Selector de sede */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-[#426a5a] mb-2">Seleccionar Sede</label>
+          <select
+            className="w-full p-2 border rounded-md"
+            value={selectedSede}
+            onChange={e => { setSelectedSede(e.target.value); setSelected(null); }}
+          >
+            {sedes.map(sede => (
+              <option key={sede.id} value={sede.id}>{sede.name}</option>
             ))}
-          </ul>
-          <div className="border-t pt-4 mt-4">
-            <h3 className="text-lg font-bold text-[#426a5a] mb-2">Agregar nueva cancha</h3>
-            <input type="text" name="nombre" placeholder="Nombre" value={nuevo.nombre} onChange={e => setNuevo({ ...nuevo, nombre: e.target.value })} className="mb-2 w-full rounded-lg border-[#7fb685] px-3 py-2" />
-            <input type="number" name="precio" placeholder="Precio" value={nuevo.precio} onChange={e => setNuevo({ ...nuevo, precio: Number(e.target.value) })} className="mb-2 w-full rounded-lg border-[#7fb685] px-3 py-2" />
-            <select name="deporte" value={nuevo.deporte} onChange={e => setNuevo({ ...nuevo, deporte: e.target.value })} className="mb-2 w-full rounded-lg border-[#7fb685] px-3 py-2">
-              <option value="">Seleccionar deporte</option>
-              {/* Puedes cargar deportes desde la API si lo deseas */}
-              <option value="Fútbol 5">Fútbol 5</option>
-              <option value="Fútbol 7">Fútbol 7</option>
-              <option value="Tenis">Tenis</option>
-              <option value="Pádel">Pádel</option>
-              <option value="Basket">Basket</option>
-              <option value="Voley">Voley</option>
-            </select>
-            <textarea name="descripcion" placeholder="Descripción" value={nuevo.descripcion} onChange={e => setNuevo({ ...nuevo, descripcion: e.target.value })} className="mb-2 w-full rounded-lg border-[#7fb685] px-3 py-2" />
-            <button onClick={agregarCancha} className="w-full bg-[#426a5a] text-white font-bold py-2 rounded-lg shadow hover:bg-[#7fb685] transition-colors">Agregar cancha</button>
+          </select>
+        </div>
+        <div className="flex gap-8">
+          {/* Panel izquierdo: lista de canchas */}
+          <div className="w-1/3 bg-white/90 rounded-2xl shadow-xl p-6">
+            <h2 className="text-xl font-bold text-[#426a5a] mb-4">Canchas del complejo</h2>
+            <ul className="mb-4">
+              {canchas.map(c => (
+                <li key={c.id} className={`flex items-center justify-between mb-2 ${selected === c.id ? 'bg-[#f2c57c]/40' : ''} rounded-lg px-2 py-1`}>
+                  <button onClick={() => setSelected(c.id)} className="text-left flex-1 text-[#426a5a] font-semibold">{c.name}</button>
+                  <button onClick={() => eliminarCancha(c.id)} className="ml-2 text-red-500 hover:underline">Eliminar</button>
+                </li>
+              ))}
+            </ul>
+            <div className="border-t pt-4 mt-4">
+              <h3 className="text-lg font-bold text-[#426a5a] mb-2">Agregar nueva cancha</h3>
+              <input type="text" name="nombre" placeholder="Nombre" value={nuevo.nombre} onChange={e => setNuevo({ ...nuevo, nombre: e.target.value })} className="mb-2 w-full rounded-lg border-[#7fb685] px-3 py-2" />
+              <input type="number" name="precio" placeholder="Precio" value={nuevo.precio} onChange={e => setNuevo({ ...nuevo, precio: Number(e.target.value) })} className="mb-2 w-full rounded-lg border-[#7fb685] px-3 py-2" />
+              <select name="deporte" value={nuevo.deporte} onChange={e => setNuevo({ ...nuevo, deporte: e.target.value })} className="mb-2 w-full rounded-lg border-[#7fb685] px-3 py-2">
+                <option value="">Seleccionar deporte</option>
+                {/* Puedes cargar deportes desde la API si lo deseas */}
+                <option value="Fútbol 5">Fútbol 5</option>
+                <option value="Fútbol 7">Fútbol 7</option>
+                <option value="Tenis">Tenis</option>
+                <option value="Pádel">Pádel</option>
+                <option value="Basket">Basket</option>
+                <option value="Voley">Voley</option>
+              </select>
+              <textarea name="descripcion" placeholder="Descripción" value={nuevo.descripcion} onChange={e => setNuevo({ ...nuevo, descripcion: e.target.value })} className="mb-2 w-full rounded-lg border-[#7fb685] px-3 py-2" />
+              <button onClick={agregarCancha} className="w-full bg-[#426a5a] text-white font-bold py-2 rounded-lg shadow hover:bg-[#7fb685] transition-colors">Agregar cancha</button>
+            </div>
+          </div>
+          {/* Panel derecho: edición de cancha */}
+          <div className="w-2/3">
+            {cancha ? (
+              <div className="bg-white/90 rounded-2xl shadow-xl p-8">
+                <h2 className="text-2xl font-bold text-[#426a5a] mb-4">Editar cancha</h2>
+                <div className="mb-4 grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[#426a5a] font-semibold mb-1">Nombre</label>
+                    <input
+                      type="text"
+                      name="nombre"
+                      value={cancha.nombre ?? ""}
+                      onChange={handleChange}
+                      className="w-full rounded-lg border-[#7fb685] px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[#426a5a] font-semibold mb-1">Precio</label>
+                    <input
+                      type="number"
+                      name="precio"
+                      value={cancha.precio ?? 0}
+                      onChange={handleChange}
+                      className="w-full rounded-lg border-[#7fb685] px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[#426a5a] font-semibold mb-1">Deporte</label>
+                    <select
+                      name="deporte"
+                      value={cancha.deporte ?? ""}
+                      onChange={handleChange}
+                      className="w-full rounded-lg border-[#7fb685] px-3 py-2"
+                    >
+                      <option value="">Seleccionar deporte</option>
+                      <option value="Fútbol 5">Fútbol 5</option>
+                      <option value="Fútbol 7">Fútbol 7</option>
+                      <option value="Tenis">Tenis</option>
+                      <option value="Pádel">Pádel</option>
+                      <option value="Basket">Basket</option>
+                      <option value="Voley">Voley</option>
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-[#426a5a] font-semibold mb-1">Descripción</label>
+                    <textarea
+                      name="descripcion"
+                      value={cancha.descripcion ?? ""}
+                      onChange={handleChange}
+                      className="w-full rounded-lg border-[#7fb685] px-3 py-2"
+                    />
+                  </div>
+                </div>
+                <ReglasHorarios reglas={cancha.reglas || []} setReglas={setReglas} />
+                <div className="flex justify-end">
+                  <button onClick={guardarCancha} className="bg-[#426a5a] text-white font-bold px-6 py-2 rounded-lg shadow hover:bg-[#7fb685] transition-colors">Guardar cambios</button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-[#426a5a] text-lg">Selecciona una cancha para editar sus datos y reglas de horarios.</div>
+            )}
           </div>
         </div>
-        {/* Panel derecho: edición de cancha */}
-        <div className="w-2/3">
-          {cancha ? (
-            <div className="bg-white/90 rounded-2xl shadow-xl p-8">
-              <h2 className="text-2xl font-bold text-[#426a5a] mb-4">Editar cancha</h2>
-              <div className="mb-4 grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[#426a5a] font-semibold mb-1">Nombre</label>
-                  <input
-                    type="text"
-                    name="nombre"
-                    value={cancha.nombre ?? ""}
-                    onChange={handleChange}
-                    className="w-full rounded-lg border-[#7fb685] px-3 py-2"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[#426a5a] font-semibold mb-1">Precio</label>
-                  <input
-                    type="number"
-                    name="precio"
-                    value={cancha.precio ?? 0}
-                    onChange={handleChange}
-                    className="w-full rounded-lg border-[#7fb685] px-3 py-2"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[#426a5a] font-semibold mb-1">Deporte</label>
-                  <select
-                    name="deporte"
-                    value={cancha.deporte ?? ""}
-                    onChange={handleChange}
-                    className="w-full rounded-lg border-[#7fb685] px-3 py-2"
-                  >
-                    <option value="">Seleccionar deporte</option>
-                    <option value="Fútbol 5">Fútbol 5</option>
-                    <option value="Fútbol 7">Fútbol 7</option>
-                    <option value="Tenis">Tenis</option>
-                    <option value="Pádel">Pádel</option>
-                    <option value="Basket">Basket</option>
-                    <option value="Voley">Voley</option>
-                  </select>
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-[#426a5a] font-semibold mb-1">Descripción</label>
-                  <textarea
-                    name="descripcion"
-                    value={cancha.descripcion ?? ""}
-                    onChange={handleChange}
-                    className="w-full rounded-lg border-[#7fb685] px-3 py-2"
-                  />
-                </div>
-              </div>
-              <ReglasHorarios reglas={cancha.reglas || []} setReglas={setReglas} />
-              <div className="flex justify-end">
-                <button onClick={guardarCancha} className="bg-[#426a5a] text-white font-bold px-6 py-2 rounded-lg shadow hover:bg-[#7fb685] transition-colors">Guardar cambios</button>
-              </div>
-            </div>
-          ) : (
-            <div className="text-[#426a5a] text-lg">Selecciona una cancha para editar sus datos y reglas de horarios.</div>
-          )}
-        </div>
+        <Toast open={toast.open} message={toast.message} onClose={() => setToast({ ...toast, open: false })} />
       </div>
-      <Toast open={toast.open} message={toast.message} onClose={() => setToast({ ...toast, open: false })} />
-    </div>
+    </>
   );
 }

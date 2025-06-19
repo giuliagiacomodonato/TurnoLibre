@@ -14,7 +14,8 @@ model User {
   id            String    @id @default(uuid())
   email         String    @unique
   name          String
-  password      String
+  image         String?
+  password      String?
   role          Role      @default(USER)
   reservations  Reservation[]
   createdAt     DateTime  @default(now())
@@ -116,6 +117,7 @@ model Reservation {
   startTime     DateTime
   endTime       DateTime
   status        ReservationStatus @default(PENDING)
+  reason        String?  // Motivo de la reserva o bloqueo
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }

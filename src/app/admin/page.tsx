@@ -1,9 +1,47 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useSession, signIn } from "next-auth/react";
+import { useEffect, useState } from "react";
+import { AdminLoginModal } from "../ui/LoginModal";
 
 export default function AdminPage() {
   const router = useRouter();
+  const { data: session, status } = useSession();
+  const [showLogin, setShowLogin] = useState(false);
+  const [loginError, setLoginError] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (status === "loading") return;
+    if (!session) {
+      setShowLogin(true);
+    } else if ((session.user as any).role !== "ADMIN") {
+      router.replace("/");
+    } else {
+      setShowLogin(false);
+    }
+  }, [session, status, router]);
+
+  const handleAdminLogin = async (email: string, password: string) => {
+    setLoginError(undefined);
+    const result = await signIn("credentials", {
+      redirect: false,
+      email,
+      password,
+    });
+    if (result?.error) {
+      setLoginError("Credenciales incorrectas o no tienes permisos de administrador.");
+    } else {
+      setShowLogin(false);
+    }
+  };
+
+  if (!session) {
+    return <AdminLoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} onLogin={handleAdminLogin} error={loginError} />;
+  }
+  if ((session.user as any).role !== "ADMIN") {
+    return null;
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
