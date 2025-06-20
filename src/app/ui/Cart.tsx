@@ -10,10 +10,11 @@ export type CartItem = {
   image?: string;
 };
 
-export function Cart({ items, onRemove, onCheckout }: {
+export function Cart({ items, onRemove, onCheckout, loading }: {
   items: CartItem[];
   onRemove: (id: string) => void;
   onCheckout?: () => void;
+  loading?: boolean;
 }) {
   const total = items.reduce((sum, item) => sum + item.price, 0);
 
@@ -64,9 +65,9 @@ export function Cart({ items, onRemove, onCheckout }: {
           </div>
           <button className="w-full mt-6 bg-[#426a5a] text-white font-bold py-3 px-4 rounded-lg shadow-md hover:bg-[#7fb685] transition-colors duration-300"
             onClick={onCheckout}
-            disabled={items.length === 0}
+            disabled={items.length === 0 || loading}
           >
-            Ir a pagar
+            {loading ? 'Redirigiendo a MercadoPago...' : 'Ir a pagar'}
           </button>
         </div>
       </div>

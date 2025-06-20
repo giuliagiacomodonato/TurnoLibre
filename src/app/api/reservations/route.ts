@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { toZonedTime } from 'date-fns-tz';
 import { parseISO } from 'date-fns';
+import { MercadoPagoConfig, Preference } from 'mercadopago';
+
+const client = new MercadoPagoConfig({
+  accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN || '',
+});
 
 export async function GET(request: NextRequest) {
   try {
@@ -141,4 +146,42 @@ export async function GET(request: NextRequest) {
       { status: error instanceof Error && error.message.includes('inválido') ? 400 : 500 }
     );
   }
+}
+
+export async function POST(request: NextRequest) {
+  const url = new URL(request.url);
+  if (url.pathname.endsWith('/checkout')) {
+    try {
+      const { items, userEmail } = await request.json();
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return NextResponse.json({ error: 'No hay items para pagar' }, { status: 400 });
+      }
+      const preference = new Preference(client);
+      const result = await preference.create({
+        body: {
+          items: items.map((item: any) => ({
+            id: item.id,
+            title: item.name,
+            quantity: 1,
+            currency_id: 'ARS',
+            unit_price: item.price,
+            description: `${item.court} - ${item.date} - ${item.time}`,
+            picture_url: item.image || undefined,
+          })),
+          payer: userEmail ? { email: userEmail } : undefined,
+          back_urls: {
+            success: process.env.NEXT_PUBLIC_MP_SUCCESS_URL || 'http://localhost:3000/inicio/carrito?status=success',
+            failure: process.env.NEXT_PUBLIC_MP_FAILURE_URL || 'http://localhost:3000/inicio/carrito?status=failure',
+            pending: process.env.NEXT_PUBLIC_MP_PENDING_URL || 'http://localhost:3000/inicio/carrito?status=pending',
+          },
+          auto_return: 'approved',
+        }
+      });
+      return NextResponse.json({ init_point: result.init_point });
+    } catch (error: any) {
+      console.error('Error MercadoPago:', error);
+      return NextResponse.json({ error: error?.message || 'Error al crear preferencia de pago', details: error?.response?.data || error }, { status: 500 });
+    }
+  }
+  // ... existing code ...
 } 

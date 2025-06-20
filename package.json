@@ -21,6 +21,7 @@
     "date-fns-tz": "^3.2.0",
     "gapi-script": "^1.2.0",
     "lucide-react": "^0.514.0",
+    "mercadopago": "^2.8.0",
     "next": "^15.3.3",
     "next-auth": "^4.24.11",
     "react": "^18",

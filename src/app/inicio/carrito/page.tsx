@@ -9,14 +9,32 @@ import { useSession } from 'next-auth/react';
 export default function CarritoPage() {
   const { items, removeItem, isHydrated } = useCart();
   const [showLogin, setShowLogin] = useState(false);
+  const [loading, setLoading] = useState(false);
   const { data: session } = useSession();
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (!session) {
       setShowLogin(true);
       return;
     }
-    alert('¡Listo para pagar!');
+    setLoading(true);
+    try {
+      const res = await fetch('/api/reservations/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items, userEmail: session.user?.email }),
+      });
+      const data = await res.json();
+      if (data.init_point) {
+        window.location.href = data.init_point;
+      } else {
+        alert('Error al iniciar el pago.');
+      }
+    } catch (e) {
+      alert('Error al conectar con MercadoPago.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -28,7 +46,7 @@ export default function CarritoPage() {
             <span className="text-[#426a5a] text-xl font-semibold animate-pulse">Cargando carrito...</span>
           </div>
         ) : (
-          <Cart items={items} onRemove={removeItem} onCheckout={handleCheckout} />
+          <Cart items={items} onRemove={removeItem} onCheckout={handleCheckout} loading={loading} />
         )}
         <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} />
       </main>
