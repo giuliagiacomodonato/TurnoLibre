@@ -33,6 +33,7 @@ type Availability = {
     [facilityId: string]: {
       time: string;
       available: boolean;
+      reason?: string;
     }[];
   };
 };
@@ -78,7 +79,8 @@ export default function EditarDisponibilidad() {
     facilityId: string;
     time: string;
     isCurrentlyBlocked: boolean;
-  }>({ open: false, facilityId: "", time: "", isCurrentlyBlocked: false });
+    reason: string;
+  }>({ open: false, facilityId: "", time: "", isCurrentlyBlocked: false, reason: "" });
 
   useEffect(() => {
     if (status === "loading") return;
@@ -87,11 +89,9 @@ export default function EditarDisponibilidad() {
     }
   }, [session, status, router]);
 
-  if (!session || (session.user as any).role !== "ADMIN") {
-    return null;
-  }
-
   useEffect(() => {
+    if (!session || (session.user as any).role !== "ADMIN") return;
+    
     const fetchFacilities = async () => {
       try {
         const res = await fetch('/api/facilities');
@@ -106,20 +106,25 @@ export default function EditarDisponibilidad() {
     };
 
     fetchFacilities();
-  }, []);
+  }, [session]);
 
   useEffect(() => {
-    if (selectedFacility) {
-      setSelectedDate(getLocalDateString(new Date()));
-      generateAvailability();
-    }
-  }, [selectedFacility]);
+    if (!session || (session.user as any).role !== "ADMIN" || !selectedFacility) return;
+    
+    setSelectedDate(getLocalDateString(new Date()));
+    generateAvailability();
+  }, [selectedFacility, session]);
 
   useEffect(() => {
-    if (selectedFacility && selectedDate) {
-      generateAvailability();
-    }
-  }, [selectedFacility, selectedDate]);
+    if (!session || (session.user as any).role !== "ADMIN" || !selectedFacility || !selectedDate) return;
+    
+    generateAvailability();
+  }, [selectedFacility, selectedDate, session]);
+
+  // Early return after all hooks
+  if (!session || (session.user as any).role !== "ADMIN") {
+    return null;
+  }
 
   const generateAvailability = async () => {
     const newAvailability: Availability = {};
@@ -164,7 +169,7 @@ export default function EditarDisponibilidad() {
 
         newAvailability[dateString][selectedFacility] = timeSlots.map(slot => {
           const slotMinutes = getMinutesFromTimeString(slot);
-          const isBlocked = blocks.some((block: any) => {
+          const blockedReservation = blocks.find((block: any) => {
             // Solo considerar bloqueos con status BLOCKED
             if (block.status !== "BLOCKED") return false;
             const blockStart = new Date(block.startTime);
@@ -173,9 +178,11 @@ export default function EditarDisponibilidad() {
             const blockMinutes = blockHour * 60 + blockMinute;
             return blockMinutes === slotMinutes;
           });
+          
           return { 
             time: slot,
-            available: !isBlocked 
+            available: !blockedReservation,
+            reason: blockedReservation?.reason || undefined
           };
         });
       } catch (error) {
@@ -224,11 +231,11 @@ export default function EditarDisponibilidad() {
   };
 
   const handleSlotClick = (facilityId: string, time: string, isCurrentlyBlocked: boolean) => {
-    setConfirmModal({ open: true, facilityId, time, isCurrentlyBlocked });
+    setConfirmModal({ open: true, facilityId, time, isCurrentlyBlocked, reason: "" });
   };
 
   const handleConfirm = async () => {
-    const { facilityId, time, isCurrentlyBlocked } = confirmModal;
+    const { facilityId, time, isCurrentlyBlocked, reason } = confirmModal;
     const action = isCurrentlyBlocked ? 'desbloquear' : 'bloquear';
     try {
       const [hours, minutes] = time.split(':').map(Number);
@@ -249,6 +256,7 @@ export default function EditarDisponibilidad() {
           startTime: startTime.toISOString(),
           endTime: endTime.toISOString(),
           isBlocked: !isCurrentlyBlocked,
+          reason: !isCurrentlyBlocked ? reason : undefined, // Only send reason when blocking
         }),
       });
 
@@ -263,7 +271,7 @@ export default function EditarDisponibilidad() {
       setToastMessage('Error al actualizar la disponibilidad.');
       setShowToast(true);
     } finally {
-      setConfirmModal({ open: false, facilityId: "", time: "", isCurrentlyBlocked: false });
+      setConfirmModal({ open: false, facilityId: "", time: "", isCurrentlyBlocked: false, reason: "" });
       setTimeout(() => setShowToast(false), 3000);
     }
   };
@@ -374,6 +382,12 @@ export default function EditarDisponibilidad() {
                     }
                     return slots.map(time => {
                       const slotObj = availability[selectedDate]?.[selectedFacility]?.find(s => s.time === time);
+                      const tooltipText = slotObj?.available 
+                        ? `${time} - Disponible`
+                        : slotObj?.reason 
+                          ? `${time} - Bloqueado\nMotivo: ${slotObj.reason}`
+                          : `${time} - Bloqueado`;
+                      
                       return (
                         <div
                           key={time}
@@ -383,7 +397,7 @@ export default function EditarDisponibilidad() {
                               : 'bg-gray-300 hover:bg-red-400 cursor-pointer text-gray-400'}
                           `}
                           style={{ minWidth: '4rem' }}
-                          title={`${time} - ${slotObj?.available ? 'Disponible' : 'Bloqueado'}`}
+                          title={tooltipText}
                           onClick={() => handleSlotClick(selectedFacility, time, !(slotObj?.available))}
                         />
                       );
@@ -402,10 +416,27 @@ export default function EditarDisponibilidad() {
               <p className="mb-6 text-[#426a5a] text-center">
                 ¿Estás seguro de que quieres {confirmModal.isCurrentlyBlocked ? 'desbloquear' : 'bloquear'} el horario <b>{confirmModal.time}</b>?
               </p>
+              
+              {/* Campo de motivo solo cuando se está bloqueando */}
+              {!confirmModal.isCurrentlyBlocked && (
+                <div className="w-full mb-4">
+                  <label className="block text-sm font-medium text-[#426a5a] mb-2">
+                    Motivo del bloqueo
+                  </label>
+                  <input
+                    type="text"
+                    value={confirmModal.reason}
+                    onChange={(e) => setConfirmModal({...confirmModal, reason: e.target.value})}
+                    placeholder="Ej: Mantenimiento, Evento especial..."
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#426a5a] focus:border-transparent"
+                  />
+                </div>
+              )}
+              
               <div className="flex justify-center gap-2 w-full">
                 <button
                   className="px-4 py-2 rounded bg-gray-200 text-[#426a5a] hover:bg-gray-300"
-                  onClick={() => setConfirmModal({ open: false, facilityId: "", time: "", isCurrentlyBlocked: false })}
+                  onClick={() => setConfirmModal({ open: false, facilityId: "", time: "", isCurrentlyBlocked: false, reason: "" })}
                 >
                   Cancelar
                 </button>
@@ -416,6 +447,7 @@ export default function EditarDisponibilidad() {
                       : 'bg-[#7fb685] text-white hover:bg-[#426a5a]'
                   }`}
                   onClick={handleConfirm}
+                  disabled={!confirmModal.isCurrentlyBlocked && !confirmModal.reason.trim()}
                 >
                   Confirmar
                 </button>

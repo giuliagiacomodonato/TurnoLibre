@@ -20,12 +20,20 @@ function validateDate(dateStr: string, fieldName: string) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { facilityId, date, startTime, endTime, isBlocked } = await request.json();
+    const { facilityId, date, startTime, endTime, isBlocked, reason } = await request.json();
 
     // Validate required fields
     if (!facilityId || !date || !startTime || !endTime) {
       return NextResponse.json(
         { error: 'Todos los campos son requeridos (facilityId, date, startTime, endTime)' },
+        { status: 400 }
+      );
+    }
+
+    // Validate that reason is provided when blocking
+    if (isBlocked && !reason) {
+      return NextResponse.json(
+        { error: 'El motivo es requerido al bloquear un horario' },
         { status: 400 }
       );
     }
@@ -52,6 +60,7 @@ export async function POST(request: NextRequest) {
           startTime: parsedStartTime,
           endTime: parsedEndTime,
           status: ReservationStatus.BLOCKED,
+          reason: reason,
           userId: '38807be5-5ea6-47b5-b5ac-e852ac4b9a0b', // ID real del admin
         },
       });

@@ -29,6 +29,7 @@ interface Reservation {
   startTime: string;
   endTime: string;
   status: string;
+  reason?: string;
   user: {
     name: string;
     email: string;
@@ -39,6 +40,9 @@ interface Reservation {
       name: string;
       id: string;
     };
+    availability: {
+      slotDuration: number;
+    }[];
   };
   payment: {
     amount: number;
@@ -49,6 +53,10 @@ interface Reservation {
 interface Sport {
   id: string;
   name: string;
+  facilities: {
+    id: string;
+    name: string;
+  }[];
 }
 
 export default function ReservationsTable() {
@@ -70,8 +78,8 @@ export default function ReservationsTable() {
   // Obtener filtros de la URL
   const deporteId = searchParams.get("deporte");
   const fechaParam = searchParams.get("fecha");
-  const fecha = fechaParam || "";
   const hora = searchParams.get("hora") || "";
+  const estadoReserva = searchParams.get("estado") || "";
   const page = parseInt(searchParams.get("page") || "1");
 
   useEffect(() => {
@@ -92,12 +100,7 @@ export default function ReservationsTable() {
   useEffect(() => {
     const fetchReservations = async () => {
       try {
-        const params = new URLSearchParams();
-        if (deporteId) params.set('deporte', deporteId);
-        if (fechaParam) params.set('fecha', fechaParam);
-        if (hora) params.set('hora', hora);
-        params.set('page', page.toString());
-
+        const params = new URLSearchParams(searchParams.toString());
         const response = await fetch(`/api/reservations?${params.toString()}`);
         if (!response.ok) {
           throw new Error('Error al cargar las reservas');
@@ -113,7 +116,7 @@ export default function ReservationsTable() {
     };
 
     fetchReservations();
-  }, [deporteId, fechaParam, hora, page]);
+  }, [searchParams]);
 
   const handleFilterChange = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -122,6 +125,7 @@ export default function ReservationsTable() {
     } else {
       params.delete(key);
     }
+    params.set('page', '1');
     router.push(`/admin/ver-reservas?${params.toString()}`);
   };
 
@@ -156,7 +160,7 @@ export default function ReservationsTable() {
   return (
     <>
       {/* Filtros */}
-      <div className="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="mb-6 grid grid-cols-1 md:grid-cols-5 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Deporte</label>
           <select
@@ -166,10 +170,30 @@ export default function ReservationsTable() {
           >
             <option value="">Todos los deportes</option>
             {sports.map((sport) => (
-              <option key={sport.id} value={sport.id}>
-                {sport.name}
-              </option>
+              <optgroup key={sport.id} label={sport.name}>
+                <option value={`sport_${sport.id}`}>Todo {sport.name}</option>
+                {sport.facilities.map((facility) => (
+                  <option key={facility.id} value={`facility_${facility.id}`}>
+                    {facility.name}
+                  </option>
+                ))}
+              </optgroup>
             ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+          <select
+            className="w-full p-2 border rounded-md"
+            value={estadoReserva}
+            onChange={(e) => handleFilterChange("estado", e.target.value)}
+          >
+            <option value="">Todos los estados</option>
+            <option value="PENDING">Pendiente</option>
+            <option value="CONFIRMED">Confirmada</option>
+            <option value="CANCELLED">Cancelada</option>
+            <option value="BLOCKED">Bloqueada</option>
           </select>
         </div>
 
@@ -188,7 +212,7 @@ export default function ReservationsTable() {
           <input
             type="date"
             className="w-full p-2 border rounded-md"
-            value={fecha}
+            value={fechaParam || ""}
             onChange={(e) => handleFilterChange("fecha", e.target.value)}
           />
         </div>
@@ -254,6 +278,7 @@ export default function ReservationsTable() {
               <TableHead>Estado</TableHead>
               <TableHead>Pago</TableHead>
               <TableHead>Estado Pago</TableHead>
+              <TableHead>Motivo</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -262,6 +287,11 @@ export default function ReservationsTable() {
               const localDate = toZonedTime(reservation.date, timeZone);
               const localStart = toZonedTime(reservation.startTime, timeZone);
               const localEnd = toZonedTime(reservation.endTime, timeZone);
+              
+              // Calcular el horario de fin basándose en el slotDuration de la cancha
+              const slotDuration = reservation.facility.availability?.[0]?.slotDuration || 60; // Default 60 minutos
+              const calculatedEndTime = new Date(localStart.getTime() + slotDuration * 60000);
+              
               return (
                 <TableRow key={reservation.id}>
                   <TableCell className="font-medium">{reservation.user.name}</TableCell>
@@ -271,7 +301,7 @@ export default function ReservationsTable() {
                     {format(localDate, 'PPP', { locale: es })}
                   </TableCell>
                   <TableCell>
-                    {format(localStart, 'HH:mm')} - {format(localEnd, 'HH:mm')}
+                    {format(localStart, 'HH:mm')} - {format(calculatedEndTime, 'HH:mm')}
                   </TableCell>
                   <TableCell>
                     <span className={`px-2 py-1 rounded-full text-xs ${
@@ -301,6 +331,13 @@ export default function ReservationsTable() {
                         {reservation.payment.status}
                       </span>
                     )}
+                  </TableCell>
+                  <TableCell>
+                    {reservation.status === 'BLOCKED' && reservation.reason 
+                      ? reservation.reason
+                      : reservation.status === 'BLOCKED' && !reservation.reason
+                      ? '-'
+                      : reservation.reason || '-'}
                   </TableCell>
                 </TableRow>
               );

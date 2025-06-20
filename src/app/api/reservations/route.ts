@@ -6,10 +6,12 @@ import { parseISO } from 'date-fns';
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
+    const deporteParam = searchParams.get('deporte');
     const deporteId = searchParams.get('deporte');
     const usuarioId = searchParams.get('usuario');
     const fecha = searchParams.get('fecha');
     const hora = searchParams.get('hora');
+    const estado = searchParams.get('estado');
     const page = parseInt(searchParams.get('page') || '1');
     const pageSize = 10;
     const skip = (page - 1) * pageSize;
@@ -24,7 +26,19 @@ export async function GET(request: NextRequest) {
     const where: any = {};
     const timeZone = 'America/Argentina/Buenos_Aires';
 
-    if (deporteId) {
+    if (estado) {
+      where.status = estado;
+    }
+
+    if (deporteParam) {
+      if (deporteParam.startsWith('sport_')) {
+        where.facility = {
+          sportId: deporteParam.replace('sport_', '')
+        };
+      } else if (deporteParam.startsWith('facility_')) {
+        where.facilityId = deporteParam.replace('facility_', '');
+      }
+    } else if (deporteId) {
       where.facility = {
         sportId: deporteId
       };
@@ -107,6 +121,11 @@ export async function GET(request: NextRequest) {
               select: {
                 name: true,
                 id: true,
+              },
+            },
+            availability: {
+              select: {
+                slotDuration: true,
               },
             },
           },
