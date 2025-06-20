@@ -1,31 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { MercadoPagoConfig, Payment, Preference } from 'mercadopago';
 
+// Configurás Mercado Pago con tu token de vendedor de prueba
 const client = new MercadoPagoConfig({
-  accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN || '',
+  accessToken: process.env.MP_ACCESS_TOKEN || '',
 });
 
-// Webhook para notificaciones de MercadoPago
+// POST: crear preferencia o manejar webhook
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    // Aquí puedes manejar eventos de MercadoPago (payment, merchant_order, etc)
-    // Por ejemplo, guardar el estado del pago en tu base de datos
+
+    // CREAR PREFERENCIA
+    if (body.type === 'create_preference') {
+      const preference = new Preference(client);
+
+      const result = await preference.create({
+        body: {
+          items: body.items,
+          back_urls: {
+            success: 'https://24a7-190-245-85-128.ngrok-free.app/success',
+            failure: 'https://24a7-190-245-85-128.ngrok-free.app/failure',
+            pending: 'https://24a7-190-245-85-128.ngrok-free.app/pending',
+          },
+          auto_return: 'approved',
+        },
+      });
+
+      return NextResponse.json({ init_point: result.init_point });
+    }
+
+    // WEBHOOK: guardar notificación
     console.log('Webhook MercadoPago:', body);
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error('Error en webhook de MercadoPago:', error);
-    return NextResponse.json({ error: 'Error procesando webhook' }, { status: 500 });
+    console.error('Error en POST de MercadoPago:', error);
+    return NextResponse.json({ error: 'Error procesando POST' }, { status: 500 });
   }
 }
 
-// Endpoint para consultar el estado de un pago
+// GET: consultar el estado de un pago
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const paymentId = searchParams.get('payment_id');
+
   if (!paymentId) {
     return NextResponse.json({ error: 'Falta payment_id' }, { status: 400 });
   }
+
   try {
     const payment = new Payment(client);
     const result = await payment.get({ id: paymentId });
@@ -34,4 +56,4 @@ export async function GET(request: NextRequest) {
     console.error('Error consultando pago MercadoPago:', error);
     return NextResponse.json({ error: 'Error consultando pago' }, { status: 500 });
   }
-} 
+}

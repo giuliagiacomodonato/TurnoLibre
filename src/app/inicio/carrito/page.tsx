@@ -19,10 +19,19 @@ export default function CarritoPage() {
     }
     setLoading(true);
     try {
-      const res = await fetch('/api/reservations/checkout', {
+      const res = await fetch('/api/mercadopago', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items, userEmail: session.user?.email }),
+        body: JSON.stringify({
+          type: 'create_preference',
+          items: items.map((item, idx) => ({
+            id: item.id?.toString() || `item-${idx}`,
+            title: item.name,
+            quantity: 1,
+            unit_price: item.price,
+          })),
+          userEmail: session.user?.email,
+        }),
       });
       const data = await res.json();
       if (data.init_point) {
@@ -46,7 +55,9 @@ export default function CarritoPage() {
             <span className="text-[#426a5a] text-xl font-semibold animate-pulse">Cargando carrito...</span>
           </div>
         ) : (
-          <Cart items={items} onRemove={removeItem} onCheckout={handleCheckout} loading={loading} />
+          <>
+            <Cart items={items} onRemove={removeItem} onCheckout={handleCheckout} loading={loading} />
+          </>
         )}
         <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} />
       </main>
