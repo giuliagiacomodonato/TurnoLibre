@@ -46,4 +46,4 @@ export function VenueHours({ hours }: VenueHoursProps) {
       )}
     </div>
   );
-} 
+}

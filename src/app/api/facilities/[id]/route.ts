@@ -47,7 +47,3 @@ export async function DELETE(
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
-    const message = error instanceof Error ? error.message : 'Error al eliminar la cancha';
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
-}

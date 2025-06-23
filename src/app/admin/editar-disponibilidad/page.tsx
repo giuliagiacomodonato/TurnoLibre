@@ -163,15 +163,16 @@ export default function EditarDisponibilidad() {
         const res = await fetch(`/api/availability/blocks?date=${dateString}&facilityId=${selectedFacility}`);
         let blocks = await res.json();
         if (!Array.isArray(blocks)) blocks = [];
-        // DEBUG: Log de bloques y slots
+        
         console.log('Bloques recibidos para', dateString, selectedFacility, (blocks as Reservation[]).map((b: Reservation) => ({startTime: b.startTime, status: b.status})));
         console.log('Slots generados para', dateString, timeSlots);
 
         newAvailability[dateString][selectedFacility] = timeSlots.map(slot => {
           const slotMinutes = getMinutesFromTimeString(slot);
           const blockedReservation = blocks.find((block: any) => {
-            // Solo considerar bloqueos con status BLOCKED
-            if (block.status !== "BLOCKED") return false;
+            // Consider blocked slots, confirmed reservations, and pending reservations
+            if (block.status !== "BLOCKED" && block.status !== "CONFIRMED" && block.status !== "PENDING") return false;
+            
             const blockStart = new Date(block.startTime);
             const blockHour = blockStart.getHours();
             const blockMinute = blockStart.getMinutes();
@@ -179,10 +180,14 @@ export default function EditarDisponibilidad() {
             return blockMinutes === slotMinutes;
           });
           
+          // Check if it's a regular reservation or a blocked slot
+          const isReservation = blockedReservation && (blockedReservation.status === "CONFIRMED" || blockedReservation.status === "PENDING");
+          
           return { 
             time: slot,
             available: !blockedReservation,
-            reason: blockedReservation?.reason || undefined
+            reason: blockedReservation?.reason || (isReservation ? "Reservado" : undefined),
+            isReservation: isReservation
           };
         });
       } catch (error) {
@@ -394,11 +399,13 @@ export default function EditarDisponibilidad() {
                           className={`h-12 rounded-lg flex items-center justify-center text-sm font-semibold transition-colors \
                             ${slotObj?.available 
                               ? 'bg-[#7fb685] hover:bg-[#426a5a] cursor-pointer text-[#426a5a] hover:text-white' 
-                              : 'bg-gray-300 hover:bg-red-400 cursor-pointer text-gray-400'}
-                          `}
+                              : slotObj?.isReservation
+                                ? 'bg-blue-200 text-blue-800 cursor-not-allowed' // Reservation style
+                                : 'bg-gray-300 hover:bg-red-400 cursor-pointer text-gray-400' // Blocked style
+                            }`}
                           style={{ minWidth: '4rem' }}
                           title={tooltipText}
-                          onClick={() => handleSlotClick(selectedFacility, time, !(slotObj?.available))}
+                          onClick={() => slotObj?.isReservation ? null : handleSlotClick(selectedFacility, time, !(slotObj?.available))}
                         />
                       );
                     });

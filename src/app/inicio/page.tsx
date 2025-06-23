@@ -212,19 +212,29 @@ export default function Home() {
             current = new Date(current.getTime() + slotDuration * 60000);
           }
           // Consultar slots bloqueados desde la API
-          const blocksRes = await fetch(`/api/availability/blocks?date=${dateString}&facilityId=${facility.id}`);
-          const blocks = await blocksRes.json();
-          newAvailability[dateString][facility.id] = slots.map(slot => {
-            const slotMinutes = getMinutesFromTimeString(slot.time);
-            const isBlocked = blocks.some((block: any) => {
-              const blockStart = new Date(block.startTime);
-              const blockHour = blockStart.getHours();
-              const blockMinute = blockStart.getMinutes();
-              const blockMinutes = blockHour * 60 + blockMinute;
-              return blockMinutes === slotMinutes;
+          try {
+            const res = await fetch(`/api/availability/blocks?date=${dateString}&facilityId=${facility.id}`);
+            let blocks = await res.json();
+            if (!Array.isArray(blocks)) blocks = [];
+            
+            newAvailability[dateString][facility.id] = slots.map(slot => {
+              const slotMinutes = getMinutesFromTimeString(slot.time);
+              const blockedReservation = blocks.find((block: any) => {
+                // Consider both BLOCKED status and CONFIRMED/PENDING reservations
+                if (block.status !== "BLOCKED" && block.status !== "CONFIRMED" && block.status !== "PENDING") return false;
+                
+                const blockStart = new Date(block.startTime);
+                const blockHour = blockStart.getHours();
+                const blockMinute = blockStart.getMinutes();
+                const blockMinutes = blockHour * 60 + blockMinute;
+                return blockMinutes === slotMinutes;
+              });
+              
+              return { ...slot, available: !blockedReservation };
             });
-            return { ...slot, available: !isBlocked };
-          });
+          } catch (error) {
+            console.error('Error fetching blocks:', error);
+          }
         }
       }
       setAvailability(newAvailability);
