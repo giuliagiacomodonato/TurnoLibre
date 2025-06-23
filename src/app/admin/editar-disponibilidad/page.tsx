@@ -26,6 +26,10 @@ type Reservation = {
   endTime: string;
   status: string;
   facility: Facility;
+  user?: {
+    name: string;
+    email: string;
+  };
 };
 
 type Availability = {
@@ -35,6 +39,10 @@ type Availability = {
       available: boolean;
       reason?: string;
       isReservation?: boolean;
+      user?: {
+        name: string;
+        email: string;
+      };
     }[];
   };
 };
@@ -188,7 +196,8 @@ export default function EditarDisponibilidad() {
             time: slot,
             available: !blockedReservation,
             reason: blockedReservation?.reason || (isReservation ? "Reservado" : undefined),
-            isReservation: isReservation
+            isReservation: isReservation,
+            user: blockedReservation?.user
           };
         });
       } catch (error) {
@@ -390,9 +399,11 @@ export default function EditarDisponibilidad() {
                       const slotObj = availability[selectedDate]?.[selectedFacility]?.find(s => s.time === time);
                       const tooltipText = slotObj?.available 
                         ? `${time} - Disponible`
-                        : slotObj?.reason 
-                          ? `${time} - Bloqueado\nMotivo: ${slotObj.reason}`
-                          : `${time} - Bloqueado`;
+                        : slotObj?.isReservation && slotObj?.user
+                          ? `${time} - Reservado\nUsuario: ${slotObj.user.name}`
+                          : slotObj?.reason 
+                            ? `${time} - Bloqueado\nMotivo: ${slotObj.reason}`
+                            : `${time} - Bloqueado`;
                       
                       return (
                         <div

@@ -25,6 +25,14 @@ export async function GET(request: NextRequest) {
           in: ['BLOCKED', 'CONFIRMED', 'PENDING'],
         },
       },
+      include: {
+        user: {
+          select: {
+            name: true,
+            email: true
+          }
+        }
+      }
     });
 
     return NextResponse.json(reservations);
