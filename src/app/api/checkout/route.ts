@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { MercadoPagoConfig, Payment } from 'mercadopago';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '../auth/[...nextauth]/route';
+import { authOptions } from '../auth/authOptions';
 import { PaymentStatus, ReservationStatus } from '@prisma/client';
 
 const client = new MercadoPagoConfig({
