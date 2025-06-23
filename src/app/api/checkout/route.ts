@@ -74,6 +74,28 @@ export async function POST(request: NextRequest) {
           return null;
         }
         
+        // Obtener la información de la facility para calcular el slotDuration
+        const facility = await prisma.facility.findUnique({
+          where: { id: item.facilityId },
+          include: {
+            availability: true,
+          },
+        });
+        
+        if (!facility) {
+          console.error(`Facility ${item.facilityId} no encontrada`);
+          return null;
+        }
+        
+        // Calcular el día de la semana para obtener el slotDuration correcto
+        const [year, month, day] = item.date.split('-').map(Number);
+        const dateObj = new Date(year, month - 1, day);
+        const dayOfWeek = dateObj.getDay();
+        
+        // Buscar la availability para ese día de la semana
+        const availability = facility.availability.find(a => a.dayOfWeek === dayOfWeek);
+        const slotDuration = availability?.slotDuration || 60; // Default 60 minutos si no se encuentra
+        
         // Usar startTimeUTC si está disponible, o calcular a partir de date y time
         let startTime;
         let endTime;
@@ -81,16 +103,16 @@ export async function POST(request: NextRequest) {
         if (item.startTimeUTC) {
           // Si se envió el tiempo en UTC, usarlo directamente
           startTime = new Date(item.startTimeUTC);
-          // Suponemos duración 1 hora
-          endTime = new Date(startTime.getTime() + 60 * 60 * 1000);
+          // Calcular endTime basado en slotDuration
+          endTime = new Date(startTime.getTime() + slotDuration * 60 * 1000);
         } else {
           // Calcular startTime y endTime (compatibilidad con versiones anteriores)
           startTime = new Date(`${item.date}T${item.time}`);
-          // Suponemos duración 1 hora
-          endTime = new Date(startTime.getTime() + 60 * 60 * 1000);
+          // Calcular endTime basado en slotDuration
+          endTime = new Date(startTime.getTime() + slotDuration * 60 * 1000);
         }
         
-        console.log(`Creando reserva para facilityId=${item.facilityId}, startTime=${startTime.toISOString()}`);
+        console.log(`Creando reserva para facilityId=${item.facilityId}, startTime=${startTime.toISOString()}, endTime=${endTime.toISOString()}, slotDuration=${slotDuration} minutos`);
         
         const reserva = await prisma.reservation.create({
           data: {

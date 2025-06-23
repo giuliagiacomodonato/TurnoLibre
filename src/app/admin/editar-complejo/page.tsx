@@ -6,6 +6,7 @@ import { es } from 'date-fns/locale';
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { AdminHeader } from "../../ui/Header";
+import { CloudinaryUpload } from "../../ui/CloudinaryUpload";
 
 interface LocationSchedule {
   id: string;
@@ -43,7 +44,7 @@ export default function EditarComplejo() {
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
+  const [toast, setToast] = useState({ open: false, message: "" });
   const [newService, setNewService] = useState("");
   const [editingSchedules, setEditingSchedules] = useState<LocationSchedule[]>([]);
   const [isEditing, setIsEditing] = useState(false);
@@ -132,35 +133,35 @@ export default function EditarComplejo() {
     setSelectedLocation({ ...selectedLocation, services: updatedServices });
   };
 
-  const handleScheduleChange = (index: number, field: keyof LocationSchedule, value: any) => {
-    const updatedSchedules = [...editingSchedules];
-    if (field === 'openingTime' || field === 'closingTime') {
-      // Asegurarse de que la fecha se maneje correctamente
-      const date = new Date();
-      const [hours, minutes] = value.split(':');
-      date.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-      updatedSchedules[index] = { ...updatedSchedules[index], [field]: date.toISOString() };
-    } else {
-      updatedSchedules[index] = { ...updatedSchedules[index], [field]: value };
+
+
+
+  const handleDeleteImage = async (imageId: string) => {
+    if (!selectedLocation) return;
+
+    try {
+      const response = await fetch(`/api/images?id=${imageId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al eliminar la imagen');
+      }
+
+      // Remove the image from the selected location
+      const updatedImages = selectedLocation.images.filter(img => img.id !== imageId);
+      setSelectedLocation({ ...selectedLocation, images: updatedImages });
+      
+      setToast({
+        open: true,
+        message: "Imagen eliminada exitosamente"
+      });
+    } catch (error) {
+      setToast({
+        open: true,
+        message: error instanceof Error ? error.message : "Error al eliminar la imagen"
+      });
     }
-    setEditingSchedules(updatedSchedules);
-  };
-
-  const handleAddSchedule = () => {
-    const now = new Date();
-    const newSchedule: LocationSchedule = {
-      id: `temp-${Date.now()}`,
-      dayOfWeek: 0,
-      isOpen: true,
-      openingTime: new Date(now.setHours(8, 0, 0, 0)).toISOString(),
-      closingTime: new Date(now.setHours(20, 0, 0, 0)).toISOString()
-    };
-    setEditingSchedules([...editingSchedules, newSchedule]);
-  };
-
-  const handleRemoveSchedule = (index: number) => {
-    const updatedSchedules = editingSchedules.filter((_, i) => i !== index);
-    setEditingSchedules(updatedSchedules);
   };
 
   const handleSave = async () => {
@@ -585,6 +586,52 @@ export default function EditarComplejo() {
                     </tr>
                   </tbody>
                 </table>
+              </div>
+            </div>
+
+            {/* Gestión de Imágenes */}
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h2 className="text-xl font-semibold mb-4 text-[#426a5a]">Galería de Imágenes</h2>
+              
+              {/* Upload Section */}
+              <div className="mb-6">
+                <h3 className="text-lg font-medium text-gray-700 mb-3">Subir Nueva Imagen</h3>
+                <CloudinaryUpload
+                  locationId={selectedLocation.id}
+                  onUploadSuccess={(_, message) =>
+                    setToast({ open: true, message: message || 'Imagen subida correctamente' })
+                  }
+                  onUploadError={msg =>
+                    setToast({ open: true, message: msg || 'Error al subir la imagen' })
+                  }
+                />
+              </div>
+
+              {/* Images Display */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium text-gray-700">Imágenes Actuales</h3>
+                {!selectedLocation.images || selectedLocation.images.length === 0 ? (
+                  <p className="text-gray-500">No hay imágenes cargadas</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {selectedLocation.images.map((image) => (
+                      <div key={image.id} className="relative group">
+                        <img
+                          src={image.link}
+                          alt={`Imagen de ${selectedLocation.name}`}
+                          className="w-full h-48 object-cover rounded-lg"
+                        />
+                        <button
+                          onClick={() => handleDeleteImage(image.id)}
+                          className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                          title="Eliminar imagen"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 

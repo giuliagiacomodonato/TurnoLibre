@@ -43,6 +43,7 @@ type Location = {
   description: string | null;
   services: string[];
   schedules: LocationSchedule[];
+  images: { id: string; link: string }[];
 };
 
 type LocationSchedule = {
@@ -533,7 +534,7 @@ export default function Home() {
                 phone={location.phone}
                 sports={sports.map(s => s.name)}
                 services={location.services}
-                images={['/canchas1.jpg', '/canchas2.jpg', '/canchas3.jpg']}
+                images={location.images.length > 0 ? location.images.map(i => i.link) : ['/canchas1.jpg', '/canchas2.jpg', '/canchas3.jpg']}
                 hours={location.schedules.map(schedule => {
                   const localOpening = new Date(schedule.openingTime);
                   const localClosing = new Date(schedule.closingTime);
