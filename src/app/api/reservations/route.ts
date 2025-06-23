@@ -9,6 +9,7 @@ export async function GET(request: NextRequest) {
     const deporteParam = searchParams.get('deporte');
     const deporteId = searchParams.get('deporte');
     const usuarioId = searchParams.get('usuario');
+    const userEmail = searchParams.get('userEmail'); // Add support for email lookup
     const fecha = searchParams.get('fecha');
     const hora = searchParams.get('hora');
     const estado = searchParams.get('estado');
@@ -44,8 +45,31 @@ export async function GET(request: NextRequest) {
       };
     }
 
+    // Handle user filtering - by ID or email
     if (usuarioId) {
       where.userId = usuarioId;
+    } else if (userEmail) {
+      // Find the user by email first
+      const user = await prisma.user.findUnique({
+        where: { email: userEmail }
+      });
+      
+      if (user) {
+        console.log("Found user by email:", user.id);
+        where.userId = user.id;
+      } else {
+        console.log("No user found with email:", userEmail);
+        // Return empty results if user not found
+        return NextResponse.json({
+          reservations: [],
+          pagination: {
+            total: 0,
+            pageSize,
+            currentPage: page,
+            totalPages: 0
+          }
+        });
+      }
     }
 
     if (fecha && fecha !== '') {
@@ -160,4 +184,4 @@ export async function GET(request: NextRequest) {
       { status: error instanceof Error && error.message.includes('inválido') ? 400 : 500 }
     );
   }
-} 
+}
