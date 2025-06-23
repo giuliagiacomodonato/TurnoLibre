@@ -3,8 +3,9 @@ import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
 import { compare } from "bcryptjs";
+import type { SessionStrategy, User, Account, Session } from "next-auth";
 
-const handler = NextAuth({
+export const authOptions = {
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -33,14 +34,13 @@ const handler = NextAuth({
     }),
   ],
   session: {
-    strategy: "jwt",
+    strategy: "jwt" as SessionStrategy,
   },
   callbacks: {
-    async signIn({ user, account }) {
+    async signIn({ user, account }: { user: User; account: Account | null }) {
       const existingUser = await prisma.user.findUnique({
         where: { email: user.email! },
       });
-      // Solo crear usuario si es Google
       if (!existingUser && account?.provider === "google") {
         await prisma.user.create({
           data: {
@@ -52,8 +52,7 @@ const handler = NextAuth({
       }
       return true;
     },
-    async session({ session, token }) {
-      // Busca el usuario en la base de datos y agrega el rol a session.user
+    async session({ session, token }: { session: Session; token: any }) {
       if (session.user?.email) {
         const dbUser = await prisma.user.findUnique({
           where: { email: session.user.email },
@@ -65,6 +64,8 @@ const handler = NextAuth({
       return session;
     },
   },
-});
+};
+
+const handler = NextAuth(authOptions);
 
 export { handler as GET, handler as POST }; 

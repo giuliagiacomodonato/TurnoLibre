@@ -19,9 +19,9 @@ export async function POST(request: NextRequest) {
         body: {
           items: body.items,
           back_urls: {
-            success: 'https://24a7-190-245-85-128.ngrok-free.app/success',
-            failure: 'https://24a7-190-245-85-128.ngrok-free.app/failure',
-            pending: 'https://24a7-190-245-85-128.ngrok-free.app/pending',
+            success: 'ttps://proyecto-2-giacomodonato-kreczmer.vercel.app/success',
+            failure: 'ttps://proyecto-2-giacomodonato-kreczmer.vercel.app/failure',
+            pending: 'ttps://proyecto-2-giacomodonato-kreczmer.vercel.app/pending',
           },
           auto_return: 'approved',
         },
