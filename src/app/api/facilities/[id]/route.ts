@@ -5,8 +5,6 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const { id } = params;
-
   try {
     const { name, description, price, sportId, locationId } = await request.json();
 
@@ -18,7 +16,7 @@ export async function PUT(
     }
 
     const updatedFacility = await prisma.facility.update({
-      where: { id },
+      where: { id: params.id },
       data: {
         name,
         description,
@@ -40,13 +38,15 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const { id } = params;
-
   try {
-    await prisma.facility.delete({ where: { id } });
+    await prisma.facility.delete({ where: { id: params.id } });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error al eliminar cancha:', error);
+    const message = error instanceof Error ? error.message : 'Error al eliminar la cancha';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
     const message = error instanceof Error ? error.message : 'Error al eliminar la cancha';
     return NextResponse.json({ error: message }, { status: 500 });
   }
