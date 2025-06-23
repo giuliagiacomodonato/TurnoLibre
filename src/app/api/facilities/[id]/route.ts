@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+type RouteParams = {
+  params: {
+    id: string;
+  };
+};
+
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: RouteParams
 ) {
+  const { id } = context.params;
+  
   try {
     const { name, description, price, sportId, locationId } = await request.json();
 
@@ -16,7 +24,7 @@ export async function PUT(
     }
 
     const updatedFacility = await prisma.facility.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         name,
         description,
@@ -36,10 +44,12 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: RouteParams
 ) {
+  const { id } = context.params;
+  
   try {
-    await prisma.facility.delete({ where: { id: params.id } });
+    await prisma.facility.delete({ where: { id } });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error al eliminar cancha:', error);

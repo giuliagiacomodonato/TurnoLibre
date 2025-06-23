@@ -34,6 +34,7 @@ type Availability = {
       time: string;
       available: boolean;
       reason?: string;
+      isReservation?: boolean;
     }[];
   };
 };
