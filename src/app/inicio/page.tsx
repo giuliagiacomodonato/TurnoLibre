@@ -339,6 +339,9 @@ export default function Home() {
         facilityId: selectedFacilityDetails.id, // Add the facilityId to the cart item
       });
       handleClosePopup();
+      // Show success toast
+      setToastMessage('Turno agregado al carrito exitosamente');
+      setShowToast(true);
       // Re-fetch data to update availability after a reservation
       updateAvailability(); // Call the new update function
     }
@@ -381,6 +384,16 @@ export default function Home() {
     }
     return groups;
   }, [selectedSport, sports, selectedLocationId, selectedDate]);
+
+  // Auto-hide toast after 3 seconds
+  useEffect(() => {
+    if (showToast) {
+      const timer = setTimeout(() => {
+        setShowToast(false);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [showToast]);
 
   if (!location) {
     return <div>Cargando...</div>;
@@ -580,7 +593,7 @@ export default function Home() {
       />
 
       {showToast && (
-        <div className={`fixed bottom-4 right-4 bg-gray-800 text-white px-4 py-2 rounded shadow-lg transition-opacity duration-300 ${showToast ? 'opacity-100' : 'opacity-0'}`}>
+        <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 bg-[#7fb685] text-white px-6 py-3 rounded-lg shadow-lg transition-opacity duration-300 z-50 ${showToast ? 'opacity-100' : 'opacity-0'}`}>
           {toastMessage}
         </div>
       )}
