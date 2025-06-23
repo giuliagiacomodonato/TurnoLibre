@@ -8,6 +8,7 @@ export type CartItem = {
   court: string;
   price: number;
   image?: string;
+  facilityId: string; // Add the facilityId to the CartItem type
 };
 
 export function Cart({ items, onRemove, onCheckout, loading }: {
@@ -73,4 +74,4 @@ export function Cart({ items, onRemove, onCheckout, loading }: {
       </div>
     </div>
   );
-} 
+}

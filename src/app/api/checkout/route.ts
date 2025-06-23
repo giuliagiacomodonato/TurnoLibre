@@ -54,32 +54,60 @@ export async function POST(request: NextRequest) {
     console.log('Pago creado', pago);
 
     // Crear reservas por cada item
-    const reservas = await Promise.all(items.map(async (item: any) => {
-      // item debe tener: id, name, date, time, court, price, facilityId
-      if (!item.facilityId || !item.date || !item.time) return null;
-      // Calcular startTime y endTime
-      const startTime = new Date(`${item.date}T${item.time}`);
-      // Suponemos duración 1 hora
-      const endTime = new Date(startTime.getTime() + 60 * 60 * 1000);
-      const reserva = await prisma.reservation.create({
-        data: {
-          userId: user.id,
-          facilityId: item.facilityId,
-          paymentId: pago.id,
-          date: new Date(item.date),
-          startTime,
-          endTime,
-          status: ReservationStatus.CONFIRMED,
-          reason: '',
-        },
-      });
-      console.log('Reserva creada', reserva);
-      return reserva;
+    const reservas = await Promise.all(items.map(async (item: any, index: number) => {
+      try {
+        // item debe tener: id, name, date, time, court, price, facilityId
+        console.log(`Procesando item ${index}:`, item);
+        
+        if (!item.facilityId) {
+          console.error(`Item ${index} no tiene facilityId:`, item);
+          return null;
+        }
+        
+        if (!item.date) {
+          console.error(`Item ${index} no tiene date:`, item);
+          return null;
+        }
+        
+        if (!item.time) {
+          console.error(`Item ${index} no tiene time:`, item);
+          return null;
+        }
+        
+        // Calcular startTime y endTime
+        const startTime = new Date(`${item.date}T${item.time}`);
+        // Suponemos duración 1 hora
+        const endTime = new Date(startTime.getTime() + 60 * 60 * 1000);
+        
+        console.log(`Creando reserva para facilityId=${item.facilityId}, date=${item.date}, time=${item.time}`);
+        
+        const reserva = await prisma.reservation.create({
+          data: {
+            userId: user.id,
+            facilityId: item.facilityId,
+            paymentId: pago.id,
+            date: new Date(item.date),
+            startTime,
+            endTime,
+            status: ReservationStatus.CONFIRMED,
+            reason: '',
+          },
+        });
+        console.log('Reserva creada con éxito:', reserva);
+        return reserva;
+      } catch (error) {
+        console.error(`Error creando reserva para item ${index}:`, error);
+        return null;
+      }
     }));
 
-    return NextResponse.json({ success: true, pago, reservas });
+    // Filtrar reservas nulas y contar cuántas se crearon con éxito
+    const reservasCreadas = reservas.filter(r => r !== null);
+    console.log(`Creadas ${reservasCreadas.length} reservas de ${items.length} items`);
+
+    return NextResponse.json({ success: true, pago, reservas: reservasCreadas });
   } catch (error) {
     console.error('Error en checkout:', error);
     return NextResponse.json({ error: 'Error procesando checkout' }, { status: 500 });
   }
-} 
+}

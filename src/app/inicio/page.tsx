@@ -325,6 +325,7 @@ export default function Home() {
         court: selectedFacilityDetails.name,
         price: selectedFacilityDetails.price,
         image: '/canchas1.jpg', // You might want to add images to your facilities
+        facilityId: selectedFacilityDetails.id, // Add the facilityId to the cart item
       });
       handleClosePopup();
       // Re-fetch data to update availability after a reservation
