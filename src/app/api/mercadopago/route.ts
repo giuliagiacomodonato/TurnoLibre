@@ -19,9 +19,9 @@ export async function POST(request: NextRequest) {
         body: {
           items: body.items,
           back_urls: {
-            success: 'ttps://proyecto-2-giacomodonato-kreczmer.vercel.app/success',
-            failure: 'ttps://proyecto-2-giacomodonato-kreczmer.vercel.app/failure',
-            pending: 'ttps://proyecto-2-giacomodonato-kreczmer.vercel.app/pending',
+            success: 'https://proyecto-2-giacomodonato-kreczmer.vercel.app/success',
+            failure: 'https://proyecto-2-giacomodonato-kreczmer.vercel.app/failure',
+            pending: 'https://proyecto-2-giacomodonato-kreczmer.vercel.app/pending',
           },
           auto_return: 'approved',
         },
