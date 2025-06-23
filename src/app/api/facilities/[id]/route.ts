@@ -1,18 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-type RouteParams = {
-  params: {
-    id: string;
-  };
-};
-
 export async function PUT(
   request: NextRequest,
-  context: RouteParams
+  { params }: { params: { id: string } }
 ) {
-  const { id } = context.params;
-  
+  const { id } = await params;
+
   try {
     const { name, description, price, sportId, locationId } = await request.json();
 
@@ -44,10 +38,10 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  context: RouteParams
+  { params }: { params: { id: string } }
 ) {
-  const { id } = context.params;
-  
+  const { id } = await params;
+
   try {
     await prisma.facility.delete({ where: { id } });
     return NextResponse.json({ success: true });
@@ -57,3 +51,4 @@ export async function DELETE(
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+

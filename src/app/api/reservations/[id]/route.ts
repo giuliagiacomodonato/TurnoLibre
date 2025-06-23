@@ -5,9 +5,11 @@ import { authOptions } from '@/app/api/auth/authOptions';
 import { ReservationStatus } from '@prisma/client';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const { id } = await params;
+  
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
@@ -15,7 +17,7 @@ export async function GET(
     }
 
     const reservation = await prisma.reservation.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         facility: {
           include: {
@@ -62,6 +64,8 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const { id } = await params;
+  
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
@@ -71,7 +75,7 @@ export async function PATCH(
     const { status, reason } = await request.json();
 
     const reservation = await prisma.reservation.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: { user: true },
     });
 
@@ -95,7 +99,7 @@ export async function PATCH(
     }
 
     const updatedReservation = await prisma.reservation.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         status,
         reason: status === ReservationStatus.CANCELLED ? reason : reservation.reason,
