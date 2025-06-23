@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     // Crear reservas por cada item
     const reservas = await Promise.all(items.map(async (item: any, index: number) => {
       try {
-        // item debe tener: id, name, date, time, court, price, facilityId
+        // item debe tener: id, name, date, time, court, price, facilityId, startTimeUTC
         console.log(`Procesando item ${index}:`, item);
         
         if (!item.facilityId) {
@@ -74,12 +74,23 @@ export async function POST(request: NextRequest) {
           return null;
         }
         
-        // Calcular startTime y endTime
-        const startTime = new Date(`${item.date}T${item.time}`);
-        // Suponemos duración 1 hora
-        const endTime = new Date(startTime.getTime() + 60 * 60 * 1000);
+        // Usar startTimeUTC si está disponible, o calcular a partir de date y time
+        let startTime;
+        let endTime;
         
-        console.log(`Creando reserva para facilityId=${item.facilityId}, date=${item.date}, time=${item.time}`);
+        if (item.startTimeUTC) {
+          // Si se envió el tiempo en UTC, usarlo directamente
+          startTime = new Date(item.startTimeUTC);
+          // Suponemos duración 1 hora
+          endTime = new Date(startTime.getTime() + 60 * 60 * 1000);
+        } else {
+          // Calcular startTime y endTime (compatibilidad con versiones anteriores)
+          startTime = new Date(`${item.date}T${item.time}`);
+          // Suponemos duración 1 hora
+          endTime = new Date(startTime.getTime() + 60 * 60 * 1000);
+        }
+        
+        console.log(`Creando reserva para facilityId=${item.facilityId}, startTime=${startTime.toISOString()}`);
         
         const reserva = await prisma.reservation.create({
           data: {

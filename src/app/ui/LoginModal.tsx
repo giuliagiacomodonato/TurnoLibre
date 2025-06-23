@@ -1,45 +1,22 @@
 'use client';
 
-import { useState } from 'react';
 import { signIn } from 'next-auth/react';
+import { useState } from 'react';
 
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
+  callbackUrl?: string; // Add this parameter
 }
 
-export function LoginModal({ isOpen, onClose }: LoginModalProps) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  // You might add state for error messages later
-  // const [error, setError] = useState<string | null>(null);
+export function LoginModal({ isOpen, onClose, callbackUrl = '/' }: LoginModalProps) {
+ 
+  const handleGoogleSignIn = () => {
+    signIn('google', { callbackUrl });
+  };
 
   if (!isOpen) return null;
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    // TODO: Implement actual email/password login logic using NextAuth signIn
-    console.log('Attempting email/password login with:', { email, password });
-    // Example using signIn (uncomment and adjust when NextAuth is fully set up):
-    // const result = await signIn('credentials', {
-    //   redirect: false,
-    //   email,
-    //   password,
-    // });
-    // if (result?.error) {
-    //   setError(result.error);
-    // } else {
-    //   onClose(); // Close modal on successful login
-    //   // Optionally, redirect user or refresh page
-    // }
-
-    // For now, just close the modal after a simulated attempt
-    // onClose();
-  };
-
-  const handleGoogleSignIn = async () => {
-    signIn('google', { callbackUrl: '/inicio' });
-  };
 
   return (
     <div className="fixed inset-0 min-h-screen bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -160,4 +137,4 @@ export function AdminLoginModal({ isOpen, onClose, onLogin, error }: AdminLoginM
       </div>
     </div>
   );
-} 
+}

@@ -6,6 +6,8 @@ import { useSession } from 'next-auth/react';
 import { format, parseISO, isBefore } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { LoginModal } from '../ui/LoginModal';
+import { useRouter } from 'next/navigation';
+import { toZonedTime } from 'date-fns-tz';
 
 type Reservation = {
   id: string;
@@ -33,22 +35,27 @@ export default function ReservasPage() {
   const [loading, setLoading] = useState(true);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const { data: session, status } = useSession();
+  const router = useRouter();
 
-  // Fetch user reservations
+  // Check authentication and redirect if not logged in
   useEffect(() => {
     if (status === 'loading') return;
     
     if (!session || !session.user?.email) {
+      // Show login modal and wait for user action
       setShowLoginModal(true);
       setLoading(false);
+      // No redirect timer - let user decide by closing modal or logging in
       return;
     }
     
+    // User is authenticated and email is available, continue with fetching reservations
     const fetchReservations = async () => {
       try {
-        console.log("Fetching reservations for user:", session.user.email);
+        console.log("Fetching reservations for user:", session.user?.email);
         // Use email instead of ID since that's what we're guaranteed to have
-        const response = await fetch(`/api/reservations?userEmail=${encodeURIComponent(session.user.email)}`);
+        const userEmail = session.user?.email ?? '';
+        const response = await fetch(`/api/reservations?userEmail=${encodeURIComponent(userEmail)}`);
         if (response.ok) {
           const data = await response.json();
           console.log("Received reservations:", data.reservations);
@@ -64,7 +71,15 @@ export default function ReservasPage() {
     };
     
     fetchReservations();
-  }, [session, status]);
+  }, [session, status, router]);
+
+  // Handle closing the login modal - redirect if still not authenticated
+  const handleCloseLoginModal = () => {
+    setShowLoginModal(false);
+    if (!session) {
+      router.push('/');
+    }
+  };
 
   // Filter reservations based on active tab
   useEffect(() => {
@@ -93,6 +108,12 @@ export default function ReservasPage() {
     setSelectedReservation(null);
   }, [activeTab, reservations]);
 
+  // Helper function to convert UTC dates to local timezone
+  const convertToLocalTime = (dateString: string) => {
+    const date = parseISO(dateString);
+    return toZonedTime(date, Intl.DateTimeFormat().resolvedOptions().timeZone);
+  };
+
   const handleReservationClick = (reservation: Reservation) => {
     setSelectedReservation(reservation);
   };
@@ -119,6 +140,27 @@ export default function ReservasPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#f2c57c]/20 to-[#7fb685]/20 flex items-center justify-center">
         <div className="text-[#426a5a] text-xl">Cargando tus reservas...</div>
+      </div>
+    );
+  }
+
+  // Show auth required message instead of empty reservations if not logged in
+  if (!session) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#f2c57c]/20 to-[#7fb685]/20">
+        <Header />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-6 text-center">
+            <h1 className="text-2xl font-bold text-[#426a5a] mb-4">Acceso Restringido</h1>
+            <p className="mb-6 text-gray-600">Debes iniciar sesión para ver tus reservas.</p>
+            <p className="text-sm text-gray-500">Serás redirigido a la página principal...</p>
+          </div>
+        </div>
+        <LoginModal 
+          isOpen={showLoginModal} 
+          onClose={handleCloseLoginModal} 
+          callbackUrl="/reservas" 
+        />
       </div>
     );
   }
@@ -166,8 +208,8 @@ export default function ReservasPage() {
             ) : (
               <div className="space-y-3">
                 {filteredReservations.map(reservation => {
-                  const startTime = parseISO(reservation.startTime);
-                  const date = parseISO(reservation.date);
+                  const localStartTime = convertToLocalTime(reservation.startTime);
+                  const localDate = convertToLocalTime(reservation.date);
                   const isSelected = selectedReservation?.id === reservation.id;
                   
                   return (
@@ -183,11 +225,11 @@ export default function ReservasPage() {
                       <div className="flex justify-between">
                         <div className="font-medium text-[#426a5a]">{reservation.facility.name}</div>
                         <div className="text-gray-500 text-sm">
-                          {format(startTime, 'HH:mm')}hs
+                          {format(localStartTime, 'HH:mm')}hs
                         </div>
                       </div>
                       <div className="text-sm text-gray-600">
-                        {format(date, "EEEE d 'de' MMMM", { locale: es })}
+                        {format(localDate, "EEEE d 'de' MMMM", { locale: es })}
                       </div>
                       <div className="mt-2 flex justify-between items-center">
                         <div className="text-xs font-medium bg-[#7fb685]/20 text-[#426a5a] px-2 py-1 rounded">
@@ -225,15 +267,15 @@ export default function ReservasPage() {
                   <div>
                     <p className="text-sm text-gray-500">Fecha</p>
                     <p className="font-medium">
-                      {format(parseISO(selectedReservation.date), "d 'de' MMMM, yyyy", { locale: es })}
+                      {format(convertToLocalTime(selectedReservation.date), "d 'de' MMMM, yyyy", { locale: es })}
                     </p>
                   </div>
                   
                   <div>
                     <p className="text-sm text-gray-500">Horario</p>
                     <p className="font-medium">
-                      {format(parseISO(selectedReservation.startTime), 'HH:mm')} - 
-                      {format(parseISO(selectedReservation.endTime), 'HH:mm')}hs
+                      {format(convertToLocalTime(selectedReservation.startTime), 'HH:mm')} - 
+                      {format(convertToLocalTime(selectedReservation.endTime), 'HH:mm')}hs
                     </p>
                   </div>
                   
@@ -306,7 +348,7 @@ export default function ReservasPage() {
       </footer>
 
       {/* Login Modal */}
-      <LoginModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} />
+      <LoginModal isOpen={showLoginModal} onClose={handleCloseLoginModal} />
     </div>
   );
 }
