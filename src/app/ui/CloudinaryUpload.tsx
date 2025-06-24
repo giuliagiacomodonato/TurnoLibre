@@ -40,7 +40,6 @@ export function CloudinaryUpload({ onUploadSuccess, onUploadError, locationId }:
       }
     }
   };
-
   return (
     <div className="space-y-4">
       {!isUploading ? (
@@ -56,7 +55,7 @@ export function CloudinaryUpload({ onUploadSuccess, onUploadError, locationId }:
           }}
           className="px-4 py-2 bg-[#426a5a] text-white rounded-md hover:bg-[#2d4a3e] transition-colors"
         >
-          Subir Imagen
+         Subir Imagen
         </CldUploadButton>
       ) : (
         <button 
@@ -71,7 +70,9 @@ export function CloudinaryUpload({ onUploadSuccess, onUploadError, locationId }:
         <div className="text-sm text-gray-600">
           Procesando imagen...
         </div>
+         
       )}
+      
     </div>
   );
 }

@@ -23,30 +23,56 @@ function ReglasHorarios({ reglas, setReglas }: { reglas: any[]; setReglas: (r: a
   return (
     <div className="bg-white/90 rounded-2xl shadow-xl p-6 mb-8">
       <h2 className="text-xl font-bold text-[#426a5a] mb-4">Reglas de horarios</h2>
-      <table className="w-full mb-4">
-        <thead>
-          <tr className="text-[#426a5a] text-left">
-            <th>Día de semana</th>
-            <th>Apertura</th>
-            <th>Cierre</th>
-            <th>Duración (min)</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {reglas.map(regla => (
-            <tr key={regla.id} className="border-b last:border-b-0">
-              <td className="py-2">{regla.dia}</td>
-              <td>{regla.apertura}</td>
-              <td>{regla.cierre}</td>
-              <td>{regla.duracion.toString()}</td>
-              <td>
-                <button onClick={() => eliminarRegla(regla.id)} className="text-red-500 hover:underline ml-2">Eliminar</button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {/* Tabla en desktop, bloques en mobile */}
+      <div className="mb-4">
+        <div className="hidden md:block">
+          <table className="w-full">
+            <thead>
+              <tr className="text-[#426a5a] text-left">
+                <th>Día de semana</th>
+                <th>Apertura</th>
+                <th>Cierre</th>
+                <th>Duración (min)</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {reglas.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="text-center text-gray-400 py-4">No hay reglas para esta cancha</td>
+                </tr>
+              ) : (
+                reglas.map(regla => (
+                  <tr key={regla.id} className="border-b last:border-b-0">
+                    <td className="py-2">{regla.dia}</td>
+                    <td>{regla.apertura}</td>
+                    <td>{regla.cierre}</td>
+                    <td>{regla.duracion.toString()}</td>
+                    <td>
+                      <button onClick={() => eliminarRegla(regla.id)} className="text-red-500 hover:underline ml-2">Eliminar</button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="md:hidden flex flex-col gap-4">
+          {reglas.length === 0 ? (
+            <div className="text-center text-gray-400 py-4">No hay reglas para esta cancha</div>
+          ) : (
+            reglas.map(regla => (
+              <div key={regla.id} className="flex flex-col gap-1 border rounded-lg p-3 bg-gray-50">
+                <div><span className="font-semibold text-[#426a5a]">Día:</span> {regla.dia}</div>
+                <div><span className="font-semibold text-[#426a5a]">Apertura:</span> {regla.apertura}</div>
+                <div><span className="font-semibold text-[#426a5a]">Cierre:</span> {regla.cierre}</div>
+                <div><span className="font-semibold text-[#426a5a]">Duración:</span> {regla.duracion} min</div>
+                <button onClick={() => eliminarRegla(regla.id)} className="text-red-500 hover:underline mt-1 self-end">Eliminar</button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
       <div className="flex flex-wrap gap-4 items-end">
         <div>
           <label className="block text-[#426a5a] font-semibold mb-1">Día</label>
@@ -261,9 +287,9 @@ export default function CanchaHorariosAdmin() {
             ))}
           </select>
         </div>
-        <div className="flex gap-8">
+        <div className="flex flex-col md:flex-row gap-8">
           {/* Panel izquierdo: lista de canchas */}
-          <div className="w-1/3 bg-white/90 rounded-2xl shadow-xl p-6">
+          <div className="w-full md:w-1/3 bg-white/90 rounded-2xl shadow-xl p-6">
             <h2 className="text-xl font-bold text-[#426a5a] mb-4">Canchas del complejo</h2>
             <ul className="mb-4">
               {canchas.map(c => (
@@ -292,7 +318,7 @@ export default function CanchaHorariosAdmin() {
             </div>
           </div>
           {/* Panel derecho: edición de cancha */}
-          <div className="w-2/3">
+          <div className="w-full md:w-2/3 mt-8 md:mt-0">
             {cancha ? (
               <div className="bg-white/90 rounded-2xl shadow-xl p-8">
                 <h2 className="text-2xl font-bold text-[#426a5a] mb-4">Editar cancha</h2>

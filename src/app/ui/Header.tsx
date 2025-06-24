@@ -8,6 +8,7 @@ import { CartProvider } from './CartContext';
 
 export function Header() {
   const [showLogin, setShowLogin] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const { data: session } = useSession();
 
   return (
@@ -18,7 +19,8 @@ export function Header() {
             <img src="/logo.ico" alt="Logo" className="h-8 w-8 rounded-full" />
             TurnoLibre
           </Link>
-          <nav className="flex space-x-4 items-center">
+          {/* Desktop nav */}
+          <nav className="hidden md:flex space-x-4 items-center">
             <Link href="/inicio" className="text-[#f2c57c] hover:text-[#ddae7e] transition-colors">
               Ver Disponibles
             </Link>
@@ -27,6 +29,9 @@ export function Header() {
             </Link>
             <Link href="/inicio/carrito" className="text-[#f2c57c] hover:text-[#ddae7e] transition-colors">
               Carrito
+            </Link>
+            <Link href="/FAQ" className="text-[#f2c57c] hover:text-[#ddae7e] transition-colors">
+              FAQ
             </Link>
             {session ? (
               <div className="flex items-center space-x-2">
@@ -50,8 +55,73 @@ export function Header() {
               </button>
             )}
           </nav>
+          {/* Mobile hamburger */}
+          <div className="md:hidden flex items-center ">
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="text-[#f2c57c] focus:outline-none"
+              aria-label="Abrir menú"
+            >
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
+      {/* Mobile menu */}
+      {menuOpen && (
+        <div className="md:hidden fixed inset-0 bg-black/40 z-50" onClick={() => setMenuOpen(false)}>
+          <div className="absolute top-0 right-0 w-64 h-full flex flex-col justify-start items-stretch p-4" onClick={e => e.stopPropagation()}>
+            <div className="bg-white rounded-2xl shadow-xl p-6 flex flex-col gap-4">
+              <button
+                onClick={() => setMenuOpen(false)}
+                className="self-end mb-2 text-[#426a5a]"
+                aria-label="Cerrar menú"
+              >
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              <nav className="flex flex-col gap-2">
+                <Link href="/inicio" className="text-[#426a5a] text-lg font-semibold hover:text-[#7fb685] transition-colors" onClick={() => setMenuOpen(false)}>
+                  Ver Disponibles
+                </Link>
+                <Link href="/reservas" className="text-[#426a5a] text-lg font-semibold hover:text-[#7fb685] transition-colors" onClick={() => setMenuOpen(false)}>
+                  Mis Reservas
+                </Link>
+                <Link href="/inicio/carrito" className="text-[#426a5a] text-lg font-semibold hover:text-[#7fb685] transition-colors" onClick={() => setMenuOpen(false)}>
+                  Carrito
+                </Link>
+                <Link href="/FAQ" className="text-[#426a5a] text-lg font-semibold hover:text-[#7fb685] transition-colors" onClick={() => setMenuOpen(false)}>
+                  FAQ
+                </Link>
+                {session && session.user ? (
+                  <div className="flex flex-col gap-2 mt-2">
+                    {session.user.image && (
+                      <img src={session.user.image} alt="avatar" className="h-10 w-10 rounded-full border border-[#7fb685] self-start" />
+                    )}
+                    <span className="text-[#426a5a] font-semibold">{session.user.name || session.user.email}</span>
+                    <button
+                      onClick={() => { setMenuOpen(false); signOut({ callbackUrl: "/" }); }}
+                      className="mt-2 px-4 py-2 bg-[#f2c57c] text-[#426a5a] rounded-lg font-semibold hover:bg-[#7fb685] hover:text-white transition-colors"
+                    >
+                      Cerrar sesión
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => { setMenuOpen(false); setShowLogin(true); }}
+                    className="mt-2 px-4 py-2 bg-[#f2c57c] text-[#426a5a] rounded-lg font-semibold hover:bg-[#7fb685] hover:text-white transition-colors"
+                  >
+                    Iniciar sesión
+                  </button>
+                )}
+              </nav>
+            </div>
+          </div>
+        </div>
+      )}
       <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} />
     </header>
   );
@@ -88,6 +158,7 @@ export function AdminHeader() {
                 <Link href="/admin/ver-reservas" className="block px-4 py-2 text-[#426a5a] hover:bg-[#f2c57c]/40">Ver Reservas</Link>
                 <Link href="/admin/cancha-horarios" className="block px-4 py-2 text-[#426a5a] hover:bg-[#f2c57c]/40">Editar Canchas y Horarios</Link>
                 <Link href="/admin/editar-complejo" className="block px-4 py-2 text-[#426a5a] hover:bg-[#f2c57c]/40">Editar Complejo</Link>
+                <Link href="/admin/FAQ" className="block px-4 py-2 text-[#426a5a] hover:bg-[#f2c57c]/40">FAQ</Link>
                 <div className="border-t my-2" />
                 <Link href="/admin" className="block px-4 py-2 text-[#426a5a] hover:bg-[#f2c57c]/40 font-semibold">Volver al menú de admin</Link>
                 <button

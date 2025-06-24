@@ -56,7 +56,7 @@ export default function CarritoPage() {
           </div>
         ) : (
           <>
-            <Cart items={items} onRemove={removeItem} onCheckout={handleCheckout} loading={loading} />
+           <Cart items={items} onRemove={removeItem} onCheckout={handleCheckout} loading={loading} />
           </>
         )}
         <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} callbackUrl="/inicio/carrito" />

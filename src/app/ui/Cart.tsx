@@ -64,7 +64,8 @@ export function Cart({ items, onRemove, onCheckout, loading }: {
             <span>Total</span>
             <span className="font-bold">$ {total.toLocaleString()}</span>
           </div>
-          <button className="w-full mt-6 bg-[#426a5a] text-white font-bold py-3 px-4 rounded-lg shadow-md hover:bg-[#7fb685] transition-colors duration-300"
+          <div className="text-center text-xs text-gray-600 mt-4 mb-2 font-medium">Los turnos no se reservan hasta que esté realizado el pago</div>
+          <button className="w-full mt-2 bg-[#426a5a] text-white font-bold py-3 px-4 rounded-lg shadow-md hover:bg-[#7fb685] transition-colors duration-300"
             onClick={onCheckout}
             disabled={items.length === 0 || loading}
           >

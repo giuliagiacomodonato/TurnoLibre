@@ -11,6 +11,38 @@ export default function AdminPage() {
   const [showLogin, setShowLogin] = useState(false);
   const [loginError, setLoginError] = useState<string | undefined>(undefined);
 
+  const adminFaqs = [
+    {
+      q: '¿Cuál es el precio del sistema?',
+      a: 'Tenemos distintos planes de acuerdo a la cantidad de canchas y el país donde se encuentre la cancha. Te invitamos a ver los precios en la sección de planes.'
+    },
+    {
+      q: '¿Se pueden cobrar señas a través de la página?',
+      a: 'Sí, puedes configurar la modalidad "tarjeta en garantía", donde el usuario deberá cargar los datos de una tarjeta para poder hacer la reserva. Si la persona que hizo la reserva no cumple con la política de cancelación o falta a jugar se debitará el monto de la seña.'
+    },
+    {
+      q: '¿Cuántos usuarios administradores se puede tener?',
+      a: 'Puedes tener la cantidad de usuarios que necesites con los diferentes permisos y asignarles un rol según sus funciones. No tiene costo extra por usuario, está todo incluido en el plan.'
+    },
+    {
+      q: '¿Se pueden cargar reservas de manera interna además de recibir reservas online?',
+      a: 'Sí, puedes gestionar tu club de manera interna con la posibilidad de cargar turnos fijos, eventos de cumpleaños y torneos.'
+    },
+    {
+      q: '¿Se pueden configurar precios especiales según el día y horario?',
+      a: 'Sí, puedes personalizar precios por cada día de la semana y configurar precios por horarios ajustándolo a la dinámica de tu club.'
+    },
+    {
+      q: '¿Se puede agregar los consumos que realice el cliente?',
+      a: 'Puedes agregar los productos que consumen tus clientes en sus reservas y tener un detalle al momento de cobrarle.'
+    },
+    {
+      q: '¿Cuentan con capacitación y soporte para el uso del sistema?',
+      a: 'Sí, al dar comienzo a tu período de prueba gratuito programamos una reunión virtual con el área de soporte donde podrás ver las diferentes funcionalidades del sistema y comunicarte con el equipo para resolver dudas que vayan surgiendo.'
+    },
+  ];
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
+
   useEffect(() => {
     if (status === "loading") return;
     if (!session) {
@@ -68,11 +100,13 @@ export default function AdminPage() {
           <p className="text-gray-600">Modificar información general del complejo deportivo</p>
         </Link>
 
-        <div className="bg-white rounded-xl shadow-lg p-6">
-          <h2 className="text-xl font-bold text-[#426a5a] mb-2">Gestionar Usuarios</h2>
-          <p className="text-gray-600">Administrar usuarios y sus permisos</p>
-        </div>
+        <Link href="/admin/FAQ" className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow">
+          <h2 className="text-xl font-bold text-[#426a5a] mb-2">FAQ</h2>
+          <p className="text-gray-600">Preguntas frecuentes sobre la administración</p>
+        </Link>
       </div>
+
+   
     </div>
   );
 } 

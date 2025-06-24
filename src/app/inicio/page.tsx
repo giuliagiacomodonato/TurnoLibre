@@ -8,6 +8,7 @@ import { LoginModal } from '../ui/LoginModal';
 import { useCart } from '../ui/CartContext';
 import { toZonedTime } from 'date-fns-tz';
 import { format, parseISO } from 'date-fns';
+import { Fragment } from 'react';
 
 type Sport = {
   id: string;
@@ -90,6 +91,7 @@ export default function Home() {
   const [availability, setAvailability] = useState<Availability>({});
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Function to fetch initial data (sports and locations)
   const fetchInitialData = async () => {
@@ -403,10 +405,50 @@ export default function Home() {
     <div className="min-h-screen bg-[#426a5a]">
       <Header />
       
-      <main className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-12 gap-8">
-          {/* Sidebar */}
-          <div className="lg:col-span-2">
+      <main className="container mx-auto px-0 sm:px-2 md:px-4 py-4 md:py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 lg:gap-8">
+          {/* Sidebar (drawer en mobile) */}
+          <div className="block lg:hidden px-4 mb-4">
+            <button
+              className="w-full bg-[#f2c57c] text-[#426a5a] font-bold py-2 px-4 rounded-lg shadow-md flex items-center justify-center gap-2"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+              Deportes
+            </button>
+          </div>
+          {/* Drawer lateral para mobile */}
+          {sidebarOpen && (
+            <div className="fixed inset-0 z-50 bg-black/40" onClick={() => setSidebarOpen(false)}>
+              <div className="fixed right-0 top-0 w-1/2 h-full bg-white shadow-2xl flex flex-col p-6" onClick={e => e.stopPropagation()}>
+                <button className="self-end mb-4 text-[#426a5a]" onClick={() => setSidebarOpen(false)} aria-label="Cerrar menú">
+                  <svg className="w-8 h-8" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+                <h2 className="text-2xl font-bold text-[#426a5a] mb-4">Deportes</h2>
+                <div className="flex flex-col gap-4 w-full">
+                  {sports.map(sport => (
+                    <button
+                      key={sport.id}
+                      onClick={() => { setSelectedSport(sport.id); setSidebarOpen(false); }}
+                      className={`w-full text-left px-4 py-3 rounded-lg text-lg font-semibold transition-colors ${
+                        selectedSport === sport.id
+                          ? 'bg-[#426a5a] text-white'
+                          : 'text-[#426a5a] hover:bg-[#7fb685]/20'
+                      }`}
+                    >
+                      {sport.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          {/* Sidebar normal en desktop */}
+          <div className="hidden lg:block lg:col-span-2">
             <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-6">
               <h2 className="text-xl font-bold text-[#426a5a] mb-4">Deportes</h2>
               <div className="space-y-2">
@@ -428,10 +470,10 @@ export default function Home() {
           </div>
 
           {/* Main Content */}
-          <div className="lg:col-span-10">
+          <div className="col-span-1 lg:col-span-10 px-4 md:px-0">
             <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-6 mb-8">
               {/* Date Selector */}
-              <div className="mb-6 flex items-center justify-between">
+              <div className="mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <button
                   onClick={handlePreviousDay}
                   className="p-2 rounded-lg hover:bg-[#7fb685]/20 transition-colors"
@@ -441,11 +483,9 @@ export default function Home() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
                 </button>
-                
                 <h2 className="text-xl font-bold text-[#426a5a] capitalize">
                   {formatDate(selectedDate)}
                 </h2>
-
                 <button
                   onClick={handleNextDay}
                   className="p-2 rounded-lg hover:bg-[#7fb685]/20 transition-colors"
@@ -464,9 +504,9 @@ export default function Home() {
                     Turnos de {slotDuration} minutos
                   </div>
                   <div className="overflow-x-auto w-full">
-                    <div className="min-w-[1100px] w-max">
+                    <div className="min-w-[600px] md:min-w-[900px] lg:min-w-[1100px] w-max">
                       {/* Time Headers dinámicos */}
-                      <div className="grid grid-cols-[300px_repeat(36,1fr)] gap-1 text-center mb-4">
+                      <div className="grid grid-cols-[200px_repeat(18,1fr)] md:grid-cols-[300px_repeat(36,1fr)] gap-1 text-center mb-4">
                         <div className="col-span-1 font-bold text-[#426a5a]">Cancha</div>
                         {/* Tomar los headers del primer facility del grupo */}
                         {(() => {
@@ -486,25 +526,25 @@ export default function Home() {
                             current = new Date(current.getTime() + slotDuration * 60000);
                           }
                           return headers.map(time => (
-                            <div key={time} className="font-bold text-[#426a5a]">{time}</div>
+                            <div key={time} className="font-bold text-[#426a5a] text-xs md:text-base">{time}</div>
                           ));
                         })()}
                       </div>
                       {/* Facility Rows */}
                       {facilities.map(facility => (
-                        <div key={facility.id} className="grid grid-cols-[300px_repeat(36,1fr)] gap-1 items-center mb-4">
-                          <div className="text-sm font-semibold text-[#426a5a] pr-2">
+                        <div key={facility.id} className="grid grid-cols-[200px_repeat(18,1fr)] md:grid-cols-[300px_repeat(36,1fr)] gap-1 items-center mb-4">
+                          <div className="text-xs md:text-sm font-semibold text-[#426a5a] pr-2">
                             {facility.name}
                           </div>
                           {availability[selectedDate]?.[facility.id]?.map(slot => (
                             <div
                               key={slot.time}
-                              className={`h-12 w-16 rounded-lg mx-1 my-1 flex items-center justify-center text-sm font-semibold transition-colors \
+                              className={`h-10 w-12 md:h-12 md:w-16 rounded-lg mx-1 my-1 flex items-center justify-center text-xs md:text-sm font-semibold transition-colors \
                                 ${slot.available 
                                   ? 'bg-[#7fb685] hover:bg-[#426a5a] cursor-pointer text-[#426a5a] hover:text-white' 
                                   : 'bg-gray-300 cursor-not-allowed text-gray-400'}
                               `}
-                              style={{ minWidth: '4rem', minHeight: '3rem' }}
+                              style={{ minWidth: '3rem', minHeight: '2.5rem' }}
                               title={`${slot.time} - ${slot.available ? 'Disponible' : 'No disponible'}`}
                               onClick={() => handleSlotClick(facility.id, slot.time, slot.available)}
                             >
@@ -600,3 +640,4 @@ export default function Home() {
     </div>
   );
 }
+

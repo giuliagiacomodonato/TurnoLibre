@@ -42,10 +42,28 @@ export default function EditarComplejo() {
   const router = useRouter();
   const [locations, setLocations] = useState<Location[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const [newLocation, setNewLocation] = useState({
+    name: '',
+    address: '',
+    phone: '',
+    description: '',
+    services: [] as string[],
+    schedules: DAYS_OF_WEEK.map((_, i) => ({
+      id: `new-${i}`,
+      dayOfWeek: i,
+      isOpen: false,
+      openingTime: new Date(new Date().setHours(8,0,0,0)).toISOString(),
+      closingTime: new Date(new Date().setHours(20,0,0,0)).toISOString(),
+    })),
+    images: [] as { id: string; link: string }[],
+  });
+  const [newService, setNewService] = useState('');
+  const [newServiceCreate, setNewServiceCreate] = useState('');
+  const [newHourInputs, setNewHourInputs] = useState<{ [key: string]: { open: string; close: string } }>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState({ open: false, message: "" });
-  const [newService, setNewService] = useState("");
   const [editingSchedules, setEditingSchedules] = useState<LocationSchedule[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [editedInfo, setEditedInfo] = useState({
@@ -104,17 +122,39 @@ export default function EditarComplejo() {
   };
 
   const handleLocationChange = (locationId: string) => {
-    const location = locations.find(loc => loc.id === locationId);
-    if (location) {
-      setSelectedLocation(location);
-      setEditingSchedules(location.schedules);
-      setEditedInfo({
-        name: location.name,
-        address: location.address,
-        phone: location.phone,
-        description: location.description || ""
+    if (locationId === 'create') {
+      setIsCreating(true);
+      setSelectedLocation(null);
+      setNewLocation({
+        name: '',
+        address: '',
+        phone: '',
+        description: '',
+        services: [],
+        schedules: DAYS_OF_WEEK.map((_, i) => ({
+          id: `new-${i}`,
+          dayOfWeek: i,
+          isOpen: false,
+          openingTime: new Date(new Date().setHours(8,0,0,0)).toISOString(),
+          closingTime: new Date(new Date().setHours(20,0,0,0)).toISOString(),
+        })),
+        images: [],
       });
-      setIsEditing(false);
+      setNewHourInputs({});
+    } else {
+      setIsCreating(false);
+      const location = locations.find(loc => loc.id === locationId);
+      if (location) {
+        setSelectedLocation(location);
+        setEditingSchedules(location.schedules);
+        setEditedInfo({
+          name: location.name,
+          address: location.address,
+          phone: location.phone,
+          description: location.description || ""
+        });
+        setIsEditing(false);
+      }
     }
   };
 
@@ -132,9 +172,6 @@ export default function EditarComplejo() {
     const updatedServices = selectedLocation.services.filter(service => service !== serviceToRemove);
     setSelectedLocation({ ...selectedLocation, services: updatedServices });
   };
-
-
-
 
   const handleDeleteImage = async (imageId: string) => {
     if (!selectedLocation) return;
@@ -235,6 +272,57 @@ export default function EditarComplejo() {
     }
   };
 
+  const handleAddServiceCreate = () => {
+    if (!newServiceCreate.trim()) return;
+    setNewLocation({ ...newLocation, services: [...newLocation.services, newServiceCreate.trim()] });
+    setNewServiceCreate('');
+  };
+
+  const handleRemoveServiceCreate = (serviceToRemove: string) => {
+    setNewLocation({ ...newLocation, services: newLocation.services.filter(service => service !== serviceToRemove) });
+  };
+
+  const handleSaveNewLocation = async () => {
+    try {
+      // Validar horarios
+      const invalidSchedules = newLocation.schedules.filter(schedule => {
+        if (!schedule.isOpen) return false;
+        const opening = new Date(schedule.openingTime);
+        const closing = new Date(schedule.closingTime);
+        return opening >= closing;
+      });
+      if (invalidSchedules.length > 0) {
+        setToast({ open: true, message: "Los horarios de cierre deben ser posteriores a los de apertura" });
+        return;
+      }
+      const response = await fetch('/api/locations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newLocation.name,
+          address: newLocation.address,
+          phone: newLocation.phone,
+          description: newLocation.description,
+          services: newLocation.services,
+          schedules: newLocation.schedules.map(s => ({
+            dayOfWeek: s.dayOfWeek,
+            isOpen: s.isOpen,
+            openingTime: s.openingTime,
+            closingTime: s.closingTime
+          })),
+        }),
+      });
+      if (!response.ok) throw new Error('Error al crear la sede');
+      const created = await response.json();
+      setLocations([...locations, created]);
+      setSelectedLocation(created);
+      setIsCreating(false);
+      setToast({ open: true, message: 'Sede creada exitosamente' });
+    } catch (err) {
+      setToast({ open: true, message: err instanceof Error ? err.message : 'Error al crear la sede' });
+    }
+  };
+
   if (!session || (session.user as any).role !== "ADMIN") {
     return null;
   }
@@ -268,7 +356,7 @@ export default function EditarComplejo() {
           </label>
           <select
             className="w-full p-2 border rounded-md"
-            value={selectedLocation?.id || ""}
+            value={isCreating ? 'create' : (selectedLocation?.id || "")}
             onChange={(e) => handleLocationChange(e.target.value)}
           >
             {locations.map((location) => (
@@ -276,6 +364,7 @@ export default function EditarComplejo() {
                 {location.name}
               </option>
             ))}
+            <option value="create">Crear Sede</option>
           </select>
         </div>
 
@@ -642,6 +731,188 @@ export default function EditarComplejo() {
                 className="px-6 py-2 bg-[#426a5a] text-white rounded-md hover:bg-[#2d4a3e]"
               >
                 Guardar Cambios
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Formulario de creación de sede */}
+        {isCreating && (
+          <div className="space-y-6">
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h2 className="text-xl font-semibold text-[#426a5a] mb-4">Crear Nueva Sede</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+                  <input
+                    type="text"
+                    value={newLocation.name}
+                    onChange={e => setNewLocation({ ...newLocation, name: e.target.value })}
+                    className="w-full p-2 border rounded-md"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Dirección</label>
+                  <input
+                    type="text"
+                    value={newLocation.address}
+                    onChange={e => setNewLocation({ ...newLocation, address: e.target.value })}
+                    className="w-full p-2 border rounded-md"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+                  <input
+                    type="text"
+                    value={newLocation.phone}
+                    onChange={e => setNewLocation({ ...newLocation, phone: e.target.value })}
+                    className="w-full p-2 border rounded-md"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                  <textarea
+                    value={newLocation.description}
+                    onChange={e => setNewLocation({ ...newLocation, description: e.target.value })}
+                    className="w-full p-2 border rounded-md"
+                    rows={3}
+                  />
+                </div>
+              </div>
+            </div>
+            {/* Servicios */}
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h2 className="text-xl font-semibold mb-4 text-[#426a5a]">Servicios</h2>
+              <div className="mb-4 flex gap-2">
+                <input
+                  type="text"
+                  value={newServiceCreate}
+                  onChange={e => setNewServiceCreate(e.target.value)}
+                  placeholder="Nuevo servicio"
+                  className="flex-1 p-2 border rounded-md"
+                  onKeyPress={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddServiceCreate();
+                    }
+                  }}
+                />
+                <button
+                  onClick={handleAddServiceCreate}
+                  className="px-4 py-2 bg-[#426a5a] text-white rounded-md hover:bg-[#2d4a3e]"
+                >
+                  Agregar
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {newLocation.services.map((service, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full"
+                  >
+                    <span>{service}</span>
+                    <button
+                      onClick={() => handleRemoveServiceCreate(service)}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Horarios */}
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h2 className="text-xl font-semibold mb-4 text-[#426a5a]">Horarios</h2>
+              <div className="overflow-x-auto">
+                <table className="min-w-full border text-center">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="p-2 border">Día</th>
+                      <th className="p-2 border">Abierto</th>
+                      <th className="p-2 border">Hora Apertura</th>
+                      <th className="p-2 border">Hora Cierre</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {DAYS_OF_WEEK.map((day, i) => {
+                      const schedule = newLocation.schedules[i];
+                      return (
+                        <tr key={i}>
+                          <td className="p-2 border font-medium">{day}</td>
+                          <td className="p-2 border">
+                            <input
+                              type="checkbox"
+                              checked={schedule.isOpen}
+                              onChange={e => {
+                                const updated = [...newLocation.schedules];
+                                updated[i].isOpen = e.target.checked;
+                                setNewLocation({ ...newLocation, schedules: updated });
+                              }}
+                            />
+                          </td>
+                          <td className="p-2 border">
+                            <input
+                              type="text"
+                              value={newHourInputs[i]?.open || format(new Date(schedule.openingTime), 'HH:mm')}
+                              disabled={!schedule.isOpen}
+                              onChange={e => {
+                                setNewHourInputs({ ...newHourInputs, [i]: { ...newHourInputs[i], open: e.target.value } });
+                              }}
+                              onBlur={e => {
+                                const value = e.target.value;
+                                if (/^\d{2}:\d{2}$/.test(value)) {
+                                  const updated = [...newLocation.schedules];
+                                  const date = new Date(schedule.openingTime || new Date());
+                                  const [h, m] = value.split(':');
+                                  date.setHours(parseInt(h), parseInt(m));
+                                  updated[i].openingTime = date.toISOString();
+                                  setNewLocation({ ...newLocation, schedules: updated });
+                                }
+                              }}
+                              placeholder="HH:mm"
+                              maxLength={5}
+                              className="w-20 p-1 border rounded text-center"
+                            />
+                          </td>
+                          <td className="p-2 border">
+                            <input
+                              type="text"
+                              value={newHourInputs[i]?.close || format(new Date(schedule.closingTime), 'HH:mm')}
+                              disabled={!schedule.isOpen}
+                              onChange={e => {
+                                setNewHourInputs({ ...newHourInputs, [i]: { ...newHourInputs[i], close: e.target.value } });
+                              }}
+                              onBlur={e => {
+                                const value = e.target.value;
+                                if (/^\d{2}:\d{2}$/.test(value)) {
+                                  const updated = [...newLocation.schedules];
+                                  const date = new Date(schedule.closingTime || new Date());
+                                  const [h, m] = value.split(':');
+                                  date.setHours(parseInt(h), parseInt(m));
+                                  updated[i].closingTime = date.toISOString();
+                                  setNewLocation({ ...newLocation, schedules: updated });
+                                }
+                              }}
+                              placeholder="HH:mm"
+                              maxLength={5}
+                              className="w-20 p-1 border rounded text-center"
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="text-center text-gray-500 italic">Podrás agregar imágenes una vez creada la sede.</div>
+            <div className="flex justify-end">
+              <button
+                onClick={handleSaveNewLocation}
+                className="bg-[#426a5a] text-white font-bold px-6 py-2 rounded-lg shadow hover:bg-[#7fb685] transition-colors"
+              >
+                Guardar Sede
               </button>
             </div>
           </div>
