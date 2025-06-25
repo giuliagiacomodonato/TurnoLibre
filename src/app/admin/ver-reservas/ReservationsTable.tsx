@@ -77,7 +77,8 @@ export default function ReservationsTable() {
 
   // Obtener filtros de la URL
   const deporteId = searchParams.get("deporte");
-  const fechaParam = searchParams.get("fecha");
+  const fechaInicio = searchParams.get("fechaInicio");
+  const fechaFin = searchParams.get("fechaFin");
   const hora = searchParams.get("hora") || "";
   const estadoReserva = searchParams.get("estado") || "";
   const page = parseInt(searchParams.get("page") || "1");
@@ -199,27 +200,36 @@ export default function ReservationsTable() {
 
         <div>
           <div className="flex justify-between items-center mb-1">
-            <label className="block text-sm font-medium text-gray-700">Fecha</label>
-            {fechaParam && (
+            <label className="block text-sm font-medium text-gray-700">Fecha desde</label>
+            {(fechaInicio || fechaFin) && (
               <button
-                onClick={() => handleFilterChange("fecha", "")}
+                onClick={() => { handleFilterChange("fechaInicio", ""); handleFilterChange("fechaFin", ""); }}
                 className="text-xs text-gray-500 hover:text-gray-700"
               >
                 Limpiar
               </button>
             )}
           </div>
-          <input
-            type="date"
-            className="w-full p-2 border rounded-md"
-            value={fechaParam || ""}
-            onChange={(e) => handleFilterChange("fecha", e.target.value)}
-          />
+          <div className="flex gap-1">
+            <input
+              type="date"
+              className="w-28 p-2 border rounded-md"
+              value={fechaInicio || ""}
+              onChange={(e) => handleFilterChange("fechaInicio", e.target.value)}
+            />
+            <span className="self-center">a</span>
+            <input
+              type="date"
+              className="w-28 p-2 border rounded-md"
+              value={fechaFin || ""}
+              onChange={(e) => handleFilterChange("fechaFin", e.target.value)}
+            />
+          </div>
         </div>
 
         <div>
           <div className="flex justify-between items-center mb-1">
-            <label className="block text-sm font-medium text-gray-700">Hora</label>
+            <label className="block text-sm font-medium text-gray-700">Hora de inicio</label>
             {hora && (
               <button
                 onClick={() => handleFilterChange("hora", "")}

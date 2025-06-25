@@ -16,6 +16,8 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1');
     const pageSize = 10;
     const skip = (page - 1) * pageSize;
+    const fechaInicio = searchParams.get('fechaInicio');
+    const fechaFin = searchParams.get('fechaFin');
 
     if (page < 1) {
       return NextResponse.json(
@@ -72,13 +74,55 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    if (fecha && fecha !== '') {
+    if (fechaInicio && fechaFin) {
       try {
-        // Parse the date string first
+        const start = parseISO(fechaInicio);
+        const end = parseISO(fechaFin);
+        where.date = {
+          gte: start,
+          lte: end,
+        };
+      } catch (error) {
+        return NextResponse.json(
+          { error: 'Formato de fecha inválido. Use YYYY-MM-DD' },
+          { status: 400 }
+        );
+      }
+    } else if (fechaInicio) {
+      try {
+        const dateObj = parseISO(fechaInicio);
+        const startOfDay = toZonedTime(dateObj, timeZone);
+        const endOfDay = toZonedTime(new Date(dateObj.setHours(23, 59, 59, 999)), timeZone);
+        where.date = {
+          gte: startOfDay,
+          lte: endOfDay,
+        };
+      } catch (error) {
+        return NextResponse.json(
+          { error: 'Formato de fecha inválido. Use YYYY-MM-DD' },
+          { status: 400 }
+        );
+      }
+    } else if (fechaFin) {
+      try {
+        const dateObj = parseISO(fechaFin);
+        const startOfDay = toZonedTime(dateObj, timeZone);
+        const endOfDay = toZonedTime(new Date(dateObj.setHours(23, 59, 59, 999)), timeZone);
+        where.date = {
+          gte: startOfDay,
+          lte: endOfDay,
+        };
+      } catch (error) {
+        return NextResponse.json(
+          { error: 'Formato de fecha inválido. Use YYYY-MM-DD' },
+          { status: 400 }
+        );
+      }
+    } else if (fecha && fecha !== '') {
+      try {
         const dateObj = parseISO(fecha);
         const startOfDayUTC = toZonedTime(dateObj, timeZone);
         const endOfDayUTC = toZonedTime(new Date(dateObj.setHours(23, 59, 59, 999)), timeZone);
-        
         where.date = {
           gte: startOfDayUTC,
           lte: endOfDayUTC,
