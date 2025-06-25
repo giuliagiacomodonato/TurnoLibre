@@ -1,7 +1,4 @@
-interface VenueLocationProps {
-  address: string;
-  phone: string;
-}
+import type { VenueLocationProps } from '@/lib/types';
 
 export function VenueLocation({ address, phone }: VenueLocationProps) {
   // Codificar la dirección para la URL de Google Maps

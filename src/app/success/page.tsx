@@ -1,9 +1,9 @@
 import { Suspense } from 'react';
-import SuccessPageContent from './SuccessPageContent';
+import SuccessPageContent from '../ui/SuccessPageContent';
 
 export default function SuccessPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Cargando...</div>}>
+    <Suspense fallback={null}>
       <SuccessPageContent />
     </Suspense>
   );

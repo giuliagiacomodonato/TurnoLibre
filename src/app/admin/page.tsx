@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useSession, signIn } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { AdminLoginModal } from "../ui/LoginModal";
+import { PushSubscribeButton } from "../ui/PushSubscribeButton";
 
 export default function AdminPage() {
   const router = useRouter();
@@ -68,6 +69,10 @@ export default function AdminPage() {
     }
   };
 
+  const handleSendNotification = async () => {
+    // Implementa la lógica para enviar una notificación
+  };
+
   if (!session) {
     return <AdminLoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} onLogin={handleAdminLogin} error={loginError} />;
   }
@@ -106,7 +111,13 @@ export default function AdminPage() {
         </Link>
       </div>
 
-   
+      <div className="mt-4">
+        <Link href="/admin/enviar-notificacion" className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition-colors font-semibold">
+          Enviar Notificación
+        </Link>
+      </div>
+
+      <PushSubscribeButton />
     </div>
   );
 } 

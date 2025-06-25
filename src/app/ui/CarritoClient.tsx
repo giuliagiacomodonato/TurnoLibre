@@ -1,16 +1,16 @@
-"use client"
+"use client";
 import { useState } from 'react';
-import { Cart } from '../../ui/Cart';
-import { Header } from '../../ui/Header';
-import { useCart } from '../../ui/CartContext';
-import { LoginModal } from '../../ui/LoginModal';
-import { useSession } from 'next-auth/react';
+import { Cart } from './Cart';
+import { Header } from './Header';
+import { useCart } from './CartContext';
+import { LoginModal } from './LoginModal';
+import { useSession } from "next-auth/react";
 
-export default function CarritoPage() {
+export default function CarritoClient() {
+  const { data: session } = useSession();
   const { items, removeItem, isHydrated } = useCart();
   const [showLogin, setShowLogin] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { data: session } = useSession();
 
   const handleCheckout = async () => {
     if (!session) {
@@ -30,7 +30,7 @@ export default function CarritoPage() {
             quantity: 1,
             unit_price: item.price,
           })),
-          userEmail: session.user?.email,
+          userEmail: session?.user?.email,
         }),
       });
       const data = await res.json();
@@ -51,9 +51,7 @@ export default function CarritoPage() {
       <Header />
       <main>
         {!isHydrated ? (
-          <div className="flex justify-center items-center min-h-[300px]">
-            <span className="text-[#426a5a] text-xl font-semibold animate-pulse">Cargando carrito...</span>
-          </div>
+          null
         ) : (
           <>
            <Cart items={items} onRemove={removeItem} onCheckout={handleCheckout} loading={loading} />
@@ -63,4 +61,4 @@ export default function CarritoPage() {
       </main>
     </div>
   );
-}
+} 

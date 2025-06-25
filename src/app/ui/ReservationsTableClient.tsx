@@ -1,8 +1,7 @@
 "use client";
-
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Toast } from "../../ui/Toast";
+import { Toast } from "../ui/Toast";
 import {
   Table,
   TableBody,
@@ -10,11 +9,12 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from './table';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toZonedTime } from 'date-fns-tz';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import type { Reservation, Sport } from '@/lib/types';
 
 interface PaginationInfo {
   total: number;
@@ -23,43 +23,7 @@ interface PaginationInfo {
   totalPages: number;
 }
 
-interface Reservation {
-  id: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  status: string;
-  reason?: string;
-  user: {
-    name: string;
-    email: string;
-  };
-  facility: {
-    name: string;
-    sport: {
-      name: string;
-      id: string;
-    };
-    availability: {
-      slotDuration: number;
-    }[];
-  };
-  payment: {
-    amount: number;
-    status: string;
-  } | null;
-}
-
-interface Sport {
-  id: string;
-  name: string;
-  facilities: {
-    id: string;
-    name: string;
-  }[];
-}
-
-export default function ReservationsTable() {
+export default function ReservationsTableClient() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [toast, setToast] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
@@ -94,7 +58,6 @@ export default function ReservationsTable() {
         console.error('Error fetching sports:', err);
       }
     };
-
     fetchSports();
   }, []);
 
@@ -115,7 +78,6 @@ export default function ReservationsTable() {
         setLoading(false);
       }
     };
-
     fetchReservations();
   }, [searchParams]);
 
@@ -136,10 +98,18 @@ export default function ReservationsTable() {
     router.push(`/admin/ver-reservas?${params.toString()}`);
   };
 
+  const handleClearDateFilters = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("fechaInicio");
+    params.delete("fechaFin");
+    params.set("page", "1");
+    router.push(`/admin/ver-reservas?${params.toString()}`);
+  };
+
   const filteredReservations = reservations.filter(reservation => 
-    reservation.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    reservation.facility.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    reservation.facility.sport.name.toLowerCase().includes(searchTerm.toLowerCase())
+    reservation.user?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    reservation.facility?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    reservation.facility?.sport?.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (loading) {
@@ -182,7 +152,6 @@ export default function ReservationsTable() {
             ))}
           </select>
         </div>
-
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
           <select
@@ -197,14 +166,13 @@ export default function ReservationsTable() {
             <option value="BLOCKED">Bloqueada</option>
           </select>
         </div>
-
         <div>
           <div className="flex justify-between items-center mb-1">
             <label className="block text-sm font-medium text-gray-700">Fecha desde</label>
             {(fechaInicio || fechaFin) && (
               <button
-                onClick={() => { handleFilterChange("fechaInicio", ""); handleFilterChange("fechaFin", ""); }}
-                className="text-xs text-gray-500 hover:text-gray-700"
+                onClick={handleClearDateFilters}
+                className="text-xs text-gray-500 hover:text-gray-700 ml-2"
               >
                 Limpiar
               </button>
@@ -213,20 +181,19 @@ export default function ReservationsTable() {
           <div className="flex gap-1">
             <input
               type="date"
-              className="w-28 p-2 border rounded-md"
+              className="w-28 p-2 border rounded-md mr-2"
               value={fechaInicio || ""}
               onChange={(e) => handleFilterChange("fechaInicio", e.target.value)}
             />
-            <span className="self-center">a</span>
+            <span className="self-center mr-2">a</span>
             <input
               type="date"
-              className="w-28 p-2 border rounded-md"
+              className="w-28 p-2 border rounded-md mr-2"
               value={fechaFin || ""}
               onChange={(e) => handleFilterChange("fechaFin", e.target.value)}
             />
           </div>
         </div>
-
         <div>
           <div className="flex justify-between items-center mb-1">
             <label className="block text-sm font-medium text-gray-700">Hora de inicio</label>
@@ -252,7 +219,6 @@ export default function ReservationsTable() {
             ))}
           </select>
         </div>
-
         <div>
           <div className="flex justify-between items-center mb-1">
             <label className="block text-sm font-medium text-gray-700">Buscar</label>
@@ -274,7 +240,6 @@ export default function ReservationsTable() {
           />
         </div>
       </div>
-
       {/* Tabla */}
       <div className="overflow-x-auto">
         <Table>
@@ -294,21 +259,16 @@ export default function ReservationsTable() {
           <TableBody>
             {filteredReservations.map((reservation) => {
               const timeZone = 'America/Argentina/Buenos_Aires';
-              const localDate = toZonedTime(reservation.date, timeZone);
               const localStart = toZonedTime(reservation.startTime, timeZone);
-              const localEnd = toZonedTime(reservation.endTime, timeZone);
-              
-              // Calcular el horario de fin basándose en el slotDuration de la cancha
-              const slotDuration = reservation.facility.availability?.[0]?.slotDuration || 60; // Default 60 minutos
+              const slotDuration = reservation.facility?.availability?.[0]?.slotDuration || 60;
               const calculatedEndTime = new Date(localStart.getTime() + slotDuration * 60000);
-              
               return (
                 <TableRow key={reservation.id}>
-                  <TableCell className="font-medium">{reservation.user.name}</TableCell>
-                  <TableCell>{reservation.facility.sport.name}</TableCell>
-                  <TableCell>{reservation.facility.name}</TableCell>
+                  <TableCell className="font-medium">{reservation.user?.name || '-'}</TableCell>
+                  <TableCell>{reservation.facility?.sport?.name || '-'}</TableCell>
+                  <TableCell>{reservation.facility?.name || '-'}</TableCell>
                   <TableCell>
-                    {format(localDate, 'PPP', { locale: es })}
+                    {reservation.date?.slice(0, 10) || '-'}
                   </TableCell>
                   <TableCell>
                     {format(localStart, 'HH:mm')} - {format(calculatedEndTime, 'HH:mm')}
@@ -355,7 +315,6 @@ export default function ReservationsTable() {
           </TableBody>
         </Table>
       </div>
-
       {/* Paginación */}
       <div className="mt-4 flex items-center justify-between">
         <div className="text-sm text-gray-700">
@@ -381,7 +340,6 @@ export default function ReservationsTable() {
           </button>
         </div>
       </div>
-
       <Toast 
         open={toast.open} 
         message={toast.message} 

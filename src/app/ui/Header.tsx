@@ -27,7 +27,7 @@ export function Header() {
             <Link href="/reservas" className="text-[#f2c57c] hover:text-[#ddae7e] transition-colors">
               Mis Reservas
             </Link>
-            <Link href="/inicio/carrito" className="text-[#f2c57c] hover:text-[#ddae7e] transition-colors">
+            <Link href="/carrito" className="text-[#f2c57c] hover:text-[#ddae7e] transition-colors">
               Carrito
             </Link>
             <Link href="/FAQ" className="text-[#f2c57c] hover:text-[#ddae7e] transition-colors">

@@ -1,17 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-
-interface ReservationDetailsPopupProps {
-  courtName: string;
-  time: string;
-  duration: number; // duration in minutes
-  price: number;
-  onReserve: () => void;
-  onClose: () => void;
-  courtDescription?: string;
-  venueAddress?: string;
-}
+import type { ReservationDetailsPopupProps } from '@/lib/types';
 
 export function ReservationDetailsPopup({
   courtName,

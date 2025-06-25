@@ -10,7 +10,11 @@ const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
 });
-
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js');
+  });
+}
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -22,7 +26,6 @@ export default function RootLayout({
         <title>TurnoLibre</title>
         <link rel="icon" href="/logo.ico" type="image/x-icon" />
         <link rel="shortcut icon" href="/logo.ico" type="image/x-icon" />
-        {/* Si existe /public/favicon.ico, reemplázalo por tu logo o elimínalo */}
       </head>
       <body className={`${inter.variable} font-sans antialiased`}>
         <SessionProvider>

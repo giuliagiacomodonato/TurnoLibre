@@ -1,17 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { MercadoPagoConfig, Payment, Preference } from 'mercadopago';
 
-// Configurás Mercado Pago con tu token de vendedor de prueba
 const client = new MercadoPagoConfig({
   accessToken: process.env.MP_ACCESS_TOKEN || '',
 });
 
-// POST: crear preferencia o manejar webhook
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    // CREAR PREFERENCIA
     if (body.type === 'create_preference') {
       const preference = new Preference(client);
 
@@ -30,8 +27,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ init_point: result.init_point });
     }
 
-    // WEBHOOK: guardar notificación
-    console.log('Webhook MercadoPago:', body);
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error('Error en POST de MercadoPago:', error);
@@ -39,7 +34,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET: consultar el estado de un pago
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const paymentId = searchParams.get('payment_id');

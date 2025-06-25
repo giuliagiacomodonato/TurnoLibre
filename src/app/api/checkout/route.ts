@@ -43,15 +43,13 @@ export async function POST(request: NextRequest) {
       else if (estado === 'pending') status = PaymentStatus.PENDING;
     }
 
-    console.log('Antes de crear pago', { amount, status });
-    // Crear pago en la base de datos
+   
     const pago = await prisma.payment.create({
       data: {
         amount,
         status,
       },
     });
-    console.log('Pago creado', pago);
 
     // Crear reservas por cada item
     const reservas = await Promise.all(items.map(async (item: any, index: number) => {

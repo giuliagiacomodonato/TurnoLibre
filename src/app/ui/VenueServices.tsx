@@ -1,10 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-
-interface VenueServicesProps {
-  services: string[];
-}
+import type { VenueServicesProps } from '@/lib/types';
 
 export function VenueServices({ services }: VenueServicesProps) {
   const [isOpen, setIsOpen] = useState(false);

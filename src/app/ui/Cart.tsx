@@ -1,15 +1,5 @@
 import React from 'react';
-
-export type CartItem = {
-  id: string;
-  name: string;
-  date: string;
-  time: string;
-  court: string;
-  price: number;
-  image?: string;
-  facilityId: string; // Add the facilityId to the CartItem type
-};
+import type { CartItem } from '@/lib/types';
 
 export function Cart({ items, onRemove, onCheckout, loading }: {
   items: CartItem[];

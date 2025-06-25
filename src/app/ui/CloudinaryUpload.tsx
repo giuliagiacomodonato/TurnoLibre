@@ -2,12 +2,7 @@
 
 import { CldUploadButton } from 'next-cloudinary';
 import { useState } from 'react';
-
-interface CloudinaryUploadProps {
-  onUploadSuccess: (imageUrl: string, message?: string) => void;
-  onUploadError?: (error: string) => void;
-  locationId: string;
-}
+import type { CloudinaryUploadProps } from '@/lib/types';
 
 export function CloudinaryUpload({ onUploadSuccess, onUploadError, locationId }: CloudinaryUploadProps) {
   const [isUploading, setIsUploading] = useState(false);

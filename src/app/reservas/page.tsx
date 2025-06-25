@@ -1,15 +1,11 @@
-'use client';
-
-import { useState, useEffect } from 'react';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '../api/auth/authOptions';
+import { prisma } from '@/lib/prisma';
 import { Header } from '../ui/Header';
-import { useSession } from 'next-auth/react';
-import { format, parseISO, isBefore } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { LoginModal } from '../ui/LoginModal';
-import { useRouter } from 'next/navigation';
-import { toZonedTime } from 'date-fns-tz';
+import Link from 'next/link';
+import ReservasCliente from '../ui/ReservasCliente';
 
-type Reservation = {
+interface Reservation {
   id: string;
   date: string;
   startTime: string;
@@ -25,330 +21,58 @@ type Reservation = {
     amount: number;
     status: string;
   } | null;
-};
+}
 
-export default function ReservasPage() {
-  const [activeTab, setActiveTab] = useState('activas'); // 'activas', 'pasadas', 'canceladas'
-  const [reservations, setReservations] = useState<Reservation[]>([]);
-  const [filteredReservations, setFilteredReservations] = useState<Reservation[]>([]);
-  const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  const { data: session, status } = useSession();
-  const router = useRouter();
-
-  // Check authentication and redirect if not logged in
-  useEffect(() => {
-    if (status === 'loading') return;
-    
-    if (!session || !session.user?.email) {
-      // Show login modal and wait for user action
-      setShowLoginModal(true);
-      setLoading(false);
-      // No redirect timer - let user decide by closing modal or logging in
-      return;
-    }
-    
-    // User is authenticated and email is available, continue with fetching reservations
-    const fetchReservations = async () => {
-      try {
-        console.log("Fetching reservations for user:", session.user?.email);
-        // Use email instead of ID since that's what we're guaranteed to have
-        const userEmail = session.user?.email ?? '';
-        const response = await fetch(`/api/reservations?userEmail=${encodeURIComponent(userEmail)}`);
-        if (response.ok) {
-          const data = await response.json();
-          console.log("Received reservations:", data.reservations);
-          setReservations(data.reservations || []);
-        } else {
-          console.error('Error fetching reservations:', await response.text());
-        }
-      } catch (error) {
-        console.error('Error:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchReservations();
-  }, [session, status, router]);
-
-  // Handle closing the login modal - redirect if still not authenticated
-  const handleCloseLoginModal = () => {
-    setShowLoginModal(false);
-    if (!session) {
-      router.push('/');
-    }
-  };
-
-  // Filter reservations based on active tab
-  useEffect(() => {
-    if (reservations.length === 0) {
-      setFilteredReservations([]);
-      return;
-    }
-
-    const now = new Date();
-
-    const filtered = reservations.filter(reservation => {
-      const startTime = parseISO(reservation.startTime);
-      
-      if (activeTab === 'activas') {
-        return reservation.status === 'CONFIRMED' && !isBefore(startTime, now);
-      } else if (activeTab === 'pasadas') {
-        return reservation.status === 'CONFIRMED' && isBefore(startTime, now);
-      } else if (activeTab === 'canceladas') {
-        return reservation.status === 'CANCELLED';
-      }
-      return false;
-    });
-
-    setFilteredReservations(filtered);
-    // Clear selected reservation when changing tabs
-    setSelectedReservation(null);
-  }, [activeTab, reservations]);
-
-  // Helper function to convert UTC dates to local timezone
-  const convertToLocalTime = (dateString: string) => {
-    const date = parseISO(dateString);
-    return toZonedTime(date, Intl.DateTimeFormat().resolvedOptions().timeZone);
-  };
-
-  const handleReservationClick = (reservation: Reservation) => {
-    setSelectedReservation(reservation);
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'CONFIRMED': return 'Confirmada';
-      case 'CANCELLED': return 'Cancelada';
-      case 'PENDING': return 'Pendiente';
-      default: return status;
-    }
-  };
-
-  const getPaymentStatusLabel = (status: string | undefined) => {
-    switch (status) {
-      case 'PAID': return 'Pagado';
-      case 'PENDING': return 'Pendiente';
-      case 'FAILED': return 'Fallido';
-      default: return 'No disponible';
-    }
-  };
-
-  if (loading) {
+export default async function ReservasPage() {
+  const session = await getServerSession(authOptions);
+  if (!session || !session.user?.email) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#f2c57c]/20 to-[#7fb685]/20 flex items-center justify-center">
-        <div className="text-[#426a5a] text-xl">Cargando tus reservas...</div>
-      </div>
-    );
-  }
-
-  // Show auth required message instead of empty reservations if not logged in
-  if (!session) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-[#f2c57c]/20 to-[#7fb685]/20">
+      <div className="min-h-screen bg-gradient-to-br from-[#f2c57c]/20 to-[#7fb685]/20 flex flex-col items-center justify-center">
         <Header />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-6 text-center">
             <h1 className="text-2xl font-bold text-[#426a5a] mb-4">Acceso Restringido</h1>
             <p className="mb-6 text-gray-600">Debes iniciar sesión para ver tus reservas.</p>
             <p className="text-sm text-gray-500">Serás redirigido a la página principal...</p>
+            <Link href="/" className="mt-4 inline-block px-6 py-2 bg-[#426a5a] text-white rounded-lg font-semibold hover:bg-[#7fb685] transition-colors">Volver al inicio</Link>
           </div>
         </div>
-        <LoginModal 
-          isOpen={showLoginModal} 
-          onClose={handleCloseLoginModal} 
-          callbackUrl="/reservas" 
-        />
       </div>
     );
+  }
+
+  // Buscar el usuario y sus reservas
+  const user = await prisma.user.findUnique({ where: { email: session.user.email } });
+  let reservations: Reservation[] = [];
+  if (user) {
+    const dbReservations = await prisma.reservation.findMany({
+      where: { userId: user.id },
+      include: {
+        facility: { include: { sport: true } },
+        payment: true,
+      },
+      orderBy: { startTime: 'asc' },
+    });
+    reservations = dbReservations.map(r => ({
+      ...r,
+      date: typeof r.date === 'string' ? r.date : r.date.toISOString(),
+      startTime: typeof r.startTime === 'string' ? r.startTime : r.startTime.toISOString(),
+      endTime: typeof r.endTime === 'string' ? r.endTime : r.endTime.toISOString(),
+    }));
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#f2c57c]/20 to-[#7fb685]/20">
       <Header />
-
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <h1 className="text-3xl font-bold text-[#426a5a] mb-6">Mis Reservas</h1>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Columna Izquierda: Lista de Reservas */}
-          <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-6">
-            <div className="flex border-b border-gray-200 mb-4">
-              <button
-                className={`py-2 px-4 text-sm font-medium ${activeTab === 'activas' ? 'border-b-2 border-[#426a5a] text-[#426a5a]' : 'text-gray-500 hover:text-gray-700'}`}
-                onClick={() => setActiveTab('activas')}
-              >
-                ACTIVAS
-              </button>
-              <button
-                className={`py-2 px-4 text-sm font-medium ${activeTab === 'pasadas' ? 'border-b-2 border-[#426a5a] text-[#426a5a]' : 'text-gray-500 hover:text-gray-700'}`}
-                onClick={() => setActiveTab('pasadas')}
-              >
-                PASADAS
-              </button>
-              <button
-                className={`py-2 px-4 text-sm font-medium ${activeTab === 'canceladas' ? 'border-b-2 border-[#426a5a] text-[#426a5a]' : 'text-gray-500 hover:text-gray-700'}`}
-                onClick={() => setActiveTab('canceladas')}
-              >
-                CANCELADAS
-              </button>
-            </div>
-
-            {/* Content based on activeTab */}
-            {filteredReservations.length === 0 ? (
-              <div className="text-center text-gray-600 py-8">
-                {/* Placeholder from image */}
-                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
-                <p className="mt-2">No tienes reservas {activeTab === 'activas' ? 'activas' : activeTab}.</p>
-                <p className="mt-1 text-sm">Cuando realices una reserva, vas a poder revisarla aquí.</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {filteredReservations.map(reservation => {
-                  const localStartTime = convertToLocalTime(reservation.startTime);
-                  const localDate = convertToLocalTime(reservation.date);
-                  const isSelected = selectedReservation?.id === reservation.id;
-                  
-                  return (
-                    <div 
-                      key={reservation.id}
-                      onClick={() => handleReservationClick(reservation)}
-                      className={`p-4 rounded-lg border cursor-pointer transition ${
-                        isSelected 
-                          ? 'bg-[#426a5a]/10 border-[#426a5a]' 
-                          : 'hover:bg-gray-50 border-gray-200'
-                      }`}
-                    >
-                      <div className="flex justify-between">
-                        <div className="font-medium text-[#426a5a]">{reservation.facility.name}</div>
-                        <div className="text-gray-500 text-sm">
-                          {format(localStartTime, 'HH:mm')}hs
-                        </div>
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        {format(localDate, "EEEE d 'de' MMMM", { locale: es })}
-                      </div>
-                      <div className="mt-2 flex justify-between items-center">
-                        <div className="text-xs font-medium bg-[#7fb685]/20 text-[#426a5a] px-2 py-1 rounded">
-                          {reservation.facility.sport.name}
-                        </div>
-                        <div className={`text-xs font-medium px-2 py-1 rounded ${
-                          reservation.status === 'CONFIRMED' 
-                            ? 'bg-green-100 text-green-800' 
-                            : reservation.status === 'CANCELLED'
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {getStatusLabel(reservation.status)}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Columna Derecha: Detalle de Reserva */}
-          <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-6">
-            <h2 className="text-xl font-bold text-[#426a5a] mb-4">Detalle de reserva</h2>
-            
-            {selectedReservation ? (
-              <div className="space-y-4">
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h3 className="font-bold text-lg text-[#426a5a]">{selectedReservation.facility.name}</h3>
-                  <p className="text-[#426a5a]">{selectedReservation.facility.sport.name}</p>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-500">Fecha</p>
-                    <p className="font-medium">
-                      {format(convertToLocalTime(selectedReservation.date), "d 'de' MMMM, yyyy", { locale: es })}
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <p className="text-sm text-gray-500">Horario</p>
-                    <p className="font-medium">
-                      {format(convertToLocalTime(selectedReservation.startTime), 'HH:mm')} - 
-                      {format(convertToLocalTime(selectedReservation.endTime), 'HH:mm')}hs
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <p className="text-sm text-gray-500">Estado</p>
-                    <p className={`inline-block px-2 py-1 rounded text-xs font-medium ${
-                      selectedReservation.status === 'CONFIRMED' 
-                        ? 'bg-green-100 text-green-800' 
-                        : selectedReservation.status === 'CANCELLED'
-                        ? 'bg-red-100 text-red-800'
-                        : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {getStatusLabel(selectedReservation.status)}
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <p className="text-sm text-gray-500">Precio</p>
-                    <p className="font-medium">
-                      ${selectedReservation.payment?.amount.toFixed(2) || 'No disponible'}
-                    </p>
-                  </div>
-                </div>
-                
-                <div>
-                  <p className="text-sm text-gray-500">Estado del pago</p>
-                  <p className={`inline-block px-2 py-1 rounded text-xs font-medium ${
-                    selectedReservation.payment?.status === 'PAID'
-                      ? 'bg-green-100 text-green-800'
-                      : selectedReservation.payment?.status === 'PENDING'
-                      ? 'bg-yellow-100 text-yellow-800'
-                      : 'bg-red-100 text-red-800'
-                  }`}>
-                    {getPaymentStatusLabel(selectedReservation.payment?.status)}
-                  </p>
-                </div>
-                
-                {/* We could add a button to cancel the reservation if it's active */}
-                {activeTab === 'activas' && (
-                  <div className="mt-6">
-                    <button 
-                      className="w-full py-2 px-4 bg-red-500 hover:bg-red-600 text-white font-medium rounded-lg"
-                      // onClick={() => handleCancelReservation(selectedReservation.id)}
-                    >
-                      Cancelar reserva
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-center text-gray-600 py-8">
-                <div className="mx-auto mb-4 h-12 w-2/3 max-w-[200px] rounded-lg bg-gray-300 flex items-center justify-center">
-                   <div className="space-y-2">
-                     <div className="h-2 w-16 bg-gray-400 rounded"></div>
-                     <div className="h-2 w-10 bg-gray-400 rounded"></div>
-                   </div>
-                </div>
-                <p>Selecciona una reserva para ver el detalle</p>
-              </div>
-            )}
-          </div>
-        </div>
+        <ReservasCliente reservas={reservations} />
       </main>
-
-      {/* Footer */}
       <footer className="bg-[#426a5a]/90 backdrop-blur-sm mt-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <p className="text-center text-[#f2c57c]">Giulia Giacomodonato - Tomás Kreczmer</p>
         </div>
       </footer>
-
-      {/* Login Modal */}
-      <LoginModal isOpen={showLoginModal} onClose={handleCloseLoginModal} />
     </div>
   );
 }

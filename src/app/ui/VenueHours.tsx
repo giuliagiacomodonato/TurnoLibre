@@ -1,14 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-
-interface VenueHoursProps {
-  hours: {
-    day: string;
-    open: string;
-    close: string;
-  }[];
-}
+import type { VenueHoursProps } from '@/lib/types';
 
 export function VenueHours({ hours }: VenueHoursProps) {
   const [isOpen, setIsOpen] = useState(false);

@@ -1,28 +1,14 @@
 import { VenueLocation } from './VenueLocation';
 import { VenueHours } from './VenueHours';
 import { VenueServices } from './VenueServices';
-
-interface VenueInfoProps {
-  name: string;
-  description: string;
-  address: string;
-  phone: string;
-  sports: string[];
-  images: string[];
-  hours: {
-    day: string;
-    open: string;
-    close: string;
-  }[];
-  services: string[];
-}
+import type { VenueInfoProps } from '@/lib/types';
+import { DIAS_ORDEN } from '@/lib/utils';
 
 export function VenueInfo({ name, description, address, phone, sports, images, hours, services }: VenueInfoProps) {
   // Ordenar los horarios: lunes (1) a domingo (0 o 6), luego feriados
-  const diasOrden = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo', 'Feriados'];
   const sortedHours = [...hours].sort((a, b) => {
-    const idxA = diasOrden.indexOf(a.day);
-    const idxB = diasOrden.indexOf(b.day);
+    const idxA = DIAS_ORDEN.indexOf(a.day);
+    const idxB = DIAS_ORDEN.indexOf(b.day);
     return idxA - idxB;
   });
   return (

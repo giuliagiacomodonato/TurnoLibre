@@ -1,13 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { CartItem } from './Cart';
-
-interface CartContextType {
-  items: CartItem[];
-  addItem: (item: CartItem) => void;
-  removeItem: (id: string) => void;
-  clear: () => void;
-  isHydrated: boolean;
-}
+import type { CartItem, CartContextType } from '@/lib/types';
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 

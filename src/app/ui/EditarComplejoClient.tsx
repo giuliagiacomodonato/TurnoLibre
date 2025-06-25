@@ -1,0 +1,805 @@
+"use client";
+import { useState, useEffect } from "react";
+import { Toast } from "./Toast";
+import { format, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { AdminHeader } from "./Header";
+import { CloudinaryUpload } from "./CloudinaryUpload";
+import type { Location, LocationSchedule } from '@/lib/types';
+import { DAYS_OF_WEEK } from '@/lib/utils';
+
+export default function EditarComplejoClient({ locations: initialLocations }: { locations: Location[] }) {
+  const [locations, setLocations] = useState<Location[]>(initialLocations);
+  const [selectedLocation, setSelectedLocation] = useState<Location | null>(initialLocations[0] || null);
+  const [isCreating, setIsCreating] = useState(false);
+  const [newLocation, setNewLocation] = useState({
+    name: '',
+    address: '',
+    phone: '',
+    description: '',
+    services: [] as string[],
+    schedules: DAYS_OF_WEEK.map((_, i) => ({
+      id: `new-${i}`,
+      dayOfWeek: i,
+      isOpen: false,
+      openingTime: new Date(new Date().setHours(8,0,0,0)).toISOString(),
+      closingTime: new Date(new Date().setHours(20,0,0,0)).toISOString(),
+    })),
+    images: [] as { id: string; link: string }[],
+  });
+  const [newService, setNewService] = useState('');
+  const [newServiceCreate, setNewServiceCreate] = useState('');
+  const [newHourInputs, setNewHourInputs] = useState<{ [key: string]: { open: string; close: string } }>({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState({ open: false, message: "" });
+  const [editingSchedules, setEditingSchedules] = useState<LocationSchedule[]>(selectedLocation?.schedules ?? []);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedInfo, setEditedInfo] = useState({
+    name: selectedLocation?.name || "",
+    address: selectedLocation?.address || "",
+    phone: selectedLocation?.phone || "",
+    description: selectedLocation?.description || ""
+  });
+  const [hourInputs, setHourInputs] = useState<{ [key: string]: { open: string; close: string } }>({});
+
+  useEffect(() => {
+    if (selectedLocation) {
+      setEditingSchedules(selectedLocation.schedules ?? []);
+      setEditedInfo({
+        name: selectedLocation.name,
+        address: selectedLocation.address,
+        phone: selectedLocation.phone,
+        description: selectedLocation.description || ""
+      });
+    }
+  }, [selectedLocation]);
+
+  useEffect(() => {
+    const initial: { [key: string]: { open: string; close: string } } = {};
+    [...DAYS_OF_WEEK, 'Feriado'].forEach((_, i) => {
+      const s = editingSchedules.find(sch => sch.dayOfWeek === i);
+      initial[i] = {
+        open: s && s.openingTime ? format(parseISO(s.openingTime), 'HH:mm') : '08:00',
+        close: s && s.closingTime ? format(parseISO(s.closingTime), 'HH:mm') : '20:00',
+      };
+    });
+    setHourInputs(initial);
+  }, [editingSchedules]);
+
+  const handleLocationChange = (locationId: string) => {
+    if (locationId === 'create') {
+      setIsCreating(true);
+      setSelectedLocation(null);
+      setNewLocation({
+        name: '',
+        address: '',
+        phone: '',
+        description: '',
+        services: [],
+        schedules: DAYS_OF_WEEK.map((_, i) => ({
+          id: `new-${i}`,
+          dayOfWeek: i,
+          isOpen: false,
+          openingTime: new Date(new Date().setHours(8,0,0,0)).toISOString(),
+          closingTime: new Date(new Date().setHours(20,0,0,0)).toISOString(),
+        })),
+        images: [],
+      });
+      setNewHourInputs({});
+    } else {
+      setIsCreating(false);
+      const location = locations.find(loc => loc.id === locationId);
+      if (location) {
+        setSelectedLocation(location);
+        setEditingSchedules(location.schedules ?? []);
+        setEditedInfo({
+          name: location.name,
+          address: location.address,
+          phone: location.phone,
+          description: location.description || ""
+        });
+        setIsEditing(false);
+      }
+    }
+  };
+
+  const handleAddService = () => {
+    if (!selectedLocation || !newService.trim()) return;
+    const updatedServices = [...(selectedLocation.services ?? []), newService.trim()];
+    setSelectedLocation({ ...selectedLocation, services: updatedServices });
+    setNewService("");
+  };
+
+  const handleRemoveService = (serviceToRemove: string) => {
+    if (!selectedLocation) return;
+    const updatedServices = (selectedLocation.services ?? []).filter(service => service !== serviceToRemove);
+    setSelectedLocation({ ...selectedLocation, services: updatedServices });
+  };
+
+  const handleDeleteImage = async (imageId: string) => {
+    if (!selectedLocation) return;
+    try {
+      const response = await fetch(`/api/images?id=${imageId}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        throw new Error('Error al eliminar la imagen');
+      }
+      const updatedImages = (selectedLocation.images ?? []).filter(img => img.id !== imageId);setSelectedLocation({ ...selectedLocation, images: updatedImages });
+      setToast({ open: true, message: "Imagen eliminada exitosamente" });
+    } catch (error) {
+      setToast({ open: true, message: error instanceof Error ? error.message : "Error al eliminar la imagen" });
+    }
+  };
+
+  const handleSave = async () => {
+    if (!selectedLocation) return;
+    try {
+      const invalidSchedules = editingSchedules.filter(schedule => {
+        if (!schedule.isOpen) return false;
+        const opening = new Date(schedule.openingTime);
+        const closing = new Date(schedule.closingTime);
+        return opening >= closing;
+      });
+      if (invalidSchedules.length > 0) {
+        setToast({ open: true, message: "Los horarios de cierre deben ser posteriores a los de apertura" });
+        return;
+      }
+      const updateData = {
+        name: editedInfo.name,
+        address: editedInfo.address,
+        phone: editedInfo.phone,
+        description: editedInfo.description,
+        services: selectedLocation.services,
+        schedules: editingSchedules.map(schedule => ({
+          dayOfWeek: schedule.dayOfWeek,
+          isOpen: schedule.isOpen,
+          openingTime: schedule.openingTime,
+          closingTime: schedule.closingTime
+        }))
+      };
+      const response = await fetch(`/api/locations/${selectedLocation.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateData),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al guardar los cambios');
+      }
+      const updatedLocation = await response.json();
+      setLocations(locations.map(loc => loc.id === updatedLocation.id ? updatedLocation : loc));
+      setSelectedLocation(updatedLocation);
+      setEditingSchedules(updatedLocation.schedules ?? []);
+      setIsEditing(false);
+      setToast({ open: true, message: "Cambios guardados exitosamente" });
+    } catch (err) {
+      setToast({ open: true, message: err instanceof Error ? err.message : "Error al guardar los cambios" });
+    }
+  };
+
+  const handleAddServiceCreate = () => {
+    if (!newServiceCreate.trim()) return;
+    setNewLocation({ ...newLocation, services: [...newLocation.services, newServiceCreate.trim()] });
+    setNewServiceCreate('');
+  };
+
+  const handleRemoveServiceCreate = (serviceToRemove: string) => {
+    setNewLocation({ ...newLocation, services: newLocation.services.filter(service => service !== serviceToRemove) });
+  };
+
+  const handleSaveNewLocation = async () => {
+    try {
+      const invalidSchedules = newLocation.schedules.filter(schedule => {
+        if (!schedule.isOpen) return false;
+        const opening = new Date(schedule.openingTime);
+        const closing = new Date(schedule.closingTime);
+        return opening >= closing;
+      });
+      if (invalidSchedules.length > 0) {
+        setToast({ open: true, message: "Los horarios de cierre deben ser posteriores a los de apertura" });
+        return;
+      }
+      const response = await fetch('/api/locations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newLocation.name,
+          address: newLocation.address,
+          phone: newLocation.phone,
+          description: newLocation.description,
+          services: newLocation.services,
+          schedules: newLocation.schedules.map(s => ({
+            dayOfWeek: s.dayOfWeek,
+            isOpen: s.isOpen,
+            openingTime: s.openingTime,
+            closingTime: s.closingTime
+          })),
+        }),
+      });
+      if (!response.ok) throw new Error('Error al crear la sede');
+      const created = await response.json();
+      setLocations([...locations, created]);
+      setSelectedLocation(created);
+      setIsCreating(false);
+      setToast({ open: true, message: 'Sede creada exitosamente' });
+    } catch (err) {
+      setToast({ open: true, message: err instanceof Error ? err.message : 'Error al crear la sede' });
+    }
+  };
+
+  // Renderizado
+  return (
+    <>
+      <AdminHeader />
+      <div className="container mx-auto p-4">
+        <h1 className="text-2xl font-bold mb-6 text-[#426a5a]">Editar Complejo</h1>
+        {/* Selector de Sede */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Seleccionar Sede
+          </label>
+          <select
+            className="w-full p-2 border rounded-md"
+            value={isCreating ? 'create' : (selectedLocation?.id || "")}
+            onChange={(e) => handleLocationChange(e.target.value)}
+          >
+            {locations.map((location) => (
+              <option key={location.id} value={location.id}>
+                {location.name}
+              </option>
+            ))}
+            <option value="create">Crear Sede</option>
+          </select>
+        </div>
+
+        {selectedLocation && (
+          <div className="space-y-6">
+            {/* Información General */}
+            <div className="bg-white p-6 rounded-lg shadow">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold text-[#426a5a]">Información General</h2>
+                <button
+                  onClick={() => setIsEditing(!isEditing)}
+                  className="px-4 py-2 bg-[#426a5a] text-white rounded-md hover:bg-[#2d4a3e]"
+                >
+                  {isEditing ? "Cancelar" : "Editar"}
+                </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={editedInfo.name}
+                      onChange={(e) => setEditedInfo({ ...editedInfo, name: e.target.value })}
+                      className="w-full p-2 border rounded-md"
+                    />
+                  ) : (
+                    <p className="font-medium">{selectedLocation.name}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Dirección</label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={editedInfo.address}
+                      onChange={(e) => setEditedInfo({ ...editedInfo, address: e.target.value })}
+                      className="w-full p-2 border rounded-md"
+                    />
+                  ) : (
+                    <p className="font-medium">{selectedLocation.address}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={editedInfo.phone}
+                      onChange={(e) => setEditedInfo({ ...editedInfo, phone: e.target.value })}
+                      className="w-full p-2 border rounded-md"
+                    />
+                  ) : (
+                    <p className="font-medium">{selectedLocation.phone}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                  {isEditing ? (
+                    <textarea
+                      value={editedInfo.description}
+                      onChange={(e) => setEditedInfo({ ...editedInfo, description: e.target.value })}
+                      className="w-full p-2 border rounded-md"
+                      rows={3}
+                    />
+                  ) : (
+                    <p className="font-medium">{selectedLocation.description || "Sin descripción"}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Servicios */}
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h2 className="text-xl font-semibold mb-4 text-[#426a5a]">Servicios</h2>
+              <div className="mb-4">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newService}
+                    onChange={(e) => setNewService(e.target.value)}
+                    placeholder="Nuevo servicio"
+                    className="flex-1 p-2 border rounded-md"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddService();
+                      }
+                    }}
+                  />
+                  <button
+                    onClick={handleAddService}
+                    className="px-4 py-2 bg-[#426a5a] text-white rounded-md hover:bg-[#2d4a3e]"
+                  >
+                    Agregar
+                  </button>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {(selectedLocation.services ?? []).map((service, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full"
+                  >
+                    <span>{service}</span>
+                    <button
+                      onClick={() => handleRemoveService(service)}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Horarios */}
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h2 className="text-xl font-semibold mb-4 text-[#426a5a]">Horarios</h2>
+              <div className="overflow-x-auto">
+                <table className="min-w-full border text-center">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="p-2 border">Día</th>
+                      <th className="p-2 border">Abierto</th>
+                      <th className="p-2 border">Hora Apertura</th>
+                      <th className="p-2 border">Hora Cierre</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {DAYS_OF_WEEK.map((day, i) => {
+                      const schedule = editingSchedules.find(s => s.dayOfWeek === i) || {
+                        id: `temp-${i}`,
+                        dayOfWeek: i,
+                        isOpen: false,
+                        openingTime: new Date(new Date().setHours(8,0,0,0)).toISOString(),
+                        closingTime: new Date(new Date().setHours(20,0,0,0)).toISOString()
+                      };
+                      return (
+                        <tr key={i}>
+                          <td className="p-2 border font-medium">{day}</td>
+                          <td className="p-2 border">
+                            <input
+                              type="checkbox"
+                              checked={schedule.isOpen}
+                              onChange={e => {
+                                const updated = [...editingSchedules];
+                                const idx = updated.findIndex(s => s.dayOfWeek === i);
+                                if (idx !== -1) {
+                                  updated[idx].isOpen = e.target.checked;
+                                } else {
+                                  updated.push({ ...schedule, isOpen: e.target.checked });
+                                }
+                                setEditingSchedules(updated);
+                              }}
+                            />
+                          </td>
+                          <td className="p-2 border">
+                            <input
+                              type="text"
+                              value={hourInputs[i]?.open || ''}
+                              disabled={!schedule.isOpen}
+                              onChange={e => {
+                                setHourInputs({ ...hourInputs, [i]: { ...hourInputs[i], open: e.target.value } });
+                              }}
+                              onBlur={e => {
+                                const value = e.target.value;
+                                if (/^\d{2}:\d{2}$/.test(value)) {
+                                  const updated = [...editingSchedules];
+                                  const idx = updated.findIndex(s => s.dayOfWeek === i);
+                                  if (idx !== -1) {
+                                    const date = new Date(schedule.openingTime || new Date());
+                                    const [h, m] = value.split(':');
+                                    date.setHours(parseInt(h), parseInt(m));
+                                    updated[idx].openingTime = date.toISOString();
+                                  } else {
+                                    const now = new Date();
+                                    const [h, m] = value.split(':');
+                                    now.setHours(parseInt(h), parseInt(m));
+                                    updated.push({ ...schedule, openingTime: now.toISOString() });
+                                  }
+                                  setEditingSchedules(updated);
+                                }
+                              }}
+                              placeholder="HH:mm"
+                              maxLength={5}
+                              className="w-20 p-1 border rounded text-center"
+                            />
+                          </td>
+                          <td className="p-2 border">
+                            <input
+                              type="text"
+                              value={hourInputs[i]?.close || ''}
+                              disabled={!schedule.isOpen}
+                              onChange={e => {
+                                setHourInputs({ ...hourInputs, [i]: { ...hourInputs[i], close: e.target.value } });
+                              }}
+                              onBlur={e => {
+                                const value = e.target.value;
+                                if (/^\d{2}:\d{2}$/.test(value)) {
+                                  const updated = [...editingSchedules];
+                                  const idx = updated.findIndex(s => s.dayOfWeek === i);
+                                  if (idx !== -1) {
+                                    const date = new Date(schedule.closingTime || new Date());
+                                    const [h, m] = value.split(':');
+                                    date.setHours(parseInt(h), parseInt(m));
+                                    updated[idx].closingTime = date.toISOString();
+                                  } else {
+                                    const now = new Date();
+                                    const [h, m] = value.split(':');
+                                    now.setHours(parseInt(h), parseInt(m));
+                                    updated.push({ ...schedule, closingTime: now.toISOString() });
+                                  }
+                                  setEditingSchedules(updated);
+                                }
+                              }}
+                              placeholder="HH:mm"
+                              maxLength={5}
+                              className="w-20 p-1 border rounded text-center"
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {/* Feriado */}
+                    <tr>
+                      <td className="p-2 border font-medium">Feriado</td>
+                      <td className="p-2 border">
+                        <input
+                          type="checkbox"
+                          checked={!!editingSchedules.find(s => s.dayOfWeek === 7)?.isOpen}
+                          onChange={e => {
+                            const updated = [...editingSchedules];
+                            const idx = updated.findIndex(s => s.dayOfWeek === 7);
+                            if (idx !== -1) {
+                              updated[idx].isOpen = e.target.checked;
+                            } else {
+                              updated.push({ id: 'temp-7', dayOfWeek: 7, isOpen: e.target.checked, openingTime: new Date().toISOString(), closingTime: new Date().toISOString() });
+                            }
+                            setEditingSchedules(updated);
+                          }}
+                        />
+                      </td>
+                      <td className="p-2 border">
+                        <input
+                          type="text"
+                          value={hourInputs[7]?.open || ''}
+                          disabled={!editingSchedules.find(s => s.dayOfWeek === 7)?.isOpen}
+                          onChange={e => {
+                            setHourInputs({ ...hourInputs, 7: { ...hourInputs[7], open: e.target.value } });
+                          }}
+                          onBlur={e => {
+                            const value = e.target.value;
+                            if (/^\d{2}:\d{2}$/.test(value)) {
+                              const updated = [...editingSchedules];
+                              const idx = updated.findIndex(s => s.dayOfWeek === 7);
+                              if (idx !== -1) {
+                                const date = new Date(editingSchedules[idx].openingTime || new Date());
+                                const [h, m] = value.split(':');
+                                date.setHours(parseInt(h), parseInt(m));
+                                updated[idx].openingTime = date.toISOString();
+                              } else {
+                                const now = new Date();
+                                const [h, m] = value.split(':');
+                                now.setHours(parseInt(h), parseInt(m));
+                                updated.push({ id: 'temp-7', dayOfWeek: 7, isOpen: true, openingTime: now.toISOString(), closingTime: now.toISOString() });
+                              }
+                              setEditingSchedules(updated);
+                            }
+                          }}
+                          placeholder="HH:mm"
+                          maxLength={5}
+                          className="w-20 p-1 border rounded text-center"
+                        />
+                      </td>
+                      <td className="p-2 border">
+                        <input
+                          type="text"
+                          value={hourInputs[7]?.close || ''}
+                          disabled={!editingSchedules.find(s => s.dayOfWeek === 7)?.isOpen}
+                          onChange={e => {
+                            setHourInputs({ ...hourInputs, 7: { ...hourInputs[7], close: e.target.value } });
+                          }}
+                          onBlur={e => {
+                            const value = e.target.value;
+                            if (/^\d{2}:\d{2}$/.test(value)) {
+                              const updated = [...editingSchedules];
+                              const idx = updated.findIndex(s => s.dayOfWeek === 7);
+                              if (idx !== -1) {
+                                const date = new Date(editingSchedules[idx].closingTime || new Date());
+                                const [h, m] = value.split(':');
+                                date.setHours(parseInt(h), parseInt(m));
+                                updated[idx].closingTime = date.toISOString();
+                              } else {
+                                const now = new Date();
+                                const [h, m] = value.split(':');
+                                now.setHours(parseInt(h), parseInt(m));
+                                updated.push({ id: 'temp-7', dayOfWeek: 7, isOpen: true, openingTime: now.toISOString(), closingTime: now.toISOString() });
+                              }
+                              setEditingSchedules(updated);
+                            }
+                          }}
+                          placeholder="HH:mm"
+                          maxLength={5}
+                          className="w-20 p-1 border rounded text-center"
+                        />
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Gestión de Imágenes */}
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h2 className="text-xl font-semibold mb-4 text-[#426a5a]">Galería de Imágenes</h2>
+              <div className="mb-6">
+                <h3 className="text-lg font-medium text-gray-700 mb-3">Subir Nueva Imagen</h3>
+                <CloudinaryUpload
+                  locationId={selectedLocation.id}
+                  onUploadSuccess={(_, message) =>
+                    setToast({ open: true, message: message || 'Imagen subida correctamente' })
+                  }
+                  onUploadError={msg =>
+                    setToast({ open: true, message: msg || 'Error al subir la imagen' })
+                  }
+                />
+              </div>
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium text-gray-700">Imágenes Actuales</h3>
+                {(selectedLocation.images ?? []).map((image) => (
+                  <div key={image.id} className="relative group">
+                    <img
+                      src={image.link}
+                      alt={`Imagen de ${selectedLocation.name}`}
+                      className="w-full h-48 object-cover rounded-lg"
+                    />
+                    <button
+                      onClick={() => handleDeleteImage(image.id)}
+                      className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                      title="Eliminar imagen"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Botón Guardar */}
+            <div className="flex justify-end">
+              <button
+                onClick={handleSave}
+                className="px-6 py-2 bg-[#426a5a] text-white rounded-md hover:bg-[#2d4a3e]"
+              >
+                Guardar Cambios
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Formulario de creación de sede */}
+        {isCreating && (
+          <div className="space-y-6">
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h2 className="text-xl font-semibold text-[#426a5a] mb-4">Crear Nueva Sede</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+                  <input
+                    type="text"
+                    value={newLocation.name}
+                    onChange={e => setNewLocation({ ...newLocation, name: e.target.value })}
+                    className="w-full p-2 border rounded-md"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Dirección</label>
+                  <input
+                    type="text"
+                    value={newLocation.address}
+                    onChange={e => setNewLocation({ ...newLocation, address: e.target.value })}
+                    className="w-full p-2 border rounded-md"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+                  <input
+                    type="text"
+                    value={newLocation.phone}
+                    onChange={e => setNewLocation({ ...newLocation, phone: e.target.value })}
+                    className="w-full p-2 border rounded-md"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                  <textarea
+                    value={newLocation.description}
+                    onChange={e => setNewLocation({ ...newLocation, description: e.target.value })}
+                    className="w-full p-2 border rounded-md"
+                    rows={3}
+                  />
+                </div>
+              </div>
+            </div>
+            {/* Servicios */}
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h2 className="text-xl font-semibold mb-4 text-[#426a5a]">Servicios</h2>
+              <div className="mb-4 flex gap-2">
+                <input
+                  type="text"
+                  value={newServiceCreate}
+                  onChange={e => setNewServiceCreate(e.target.value)}
+                  placeholder="Nuevo servicio"
+                  className="flex-1 p-2 border rounded-md"
+                  onKeyPress={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddServiceCreate();
+                    }
+                  }}
+                />
+                <button
+                  onClick={handleAddServiceCreate}
+                  className="px-4 py-2 bg-[#426a5a] text-white rounded-md hover:bg-[#2d4a3e]"
+                >
+                  Agregar
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {newLocation.services.map((service, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full"
+                  >
+                    <span>{service}</span>
+                    <button
+                      onClick={() => handleRemoveServiceCreate(service)}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Horarios */}
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h2 className="text-xl font-semibold mb-4 text-[#426a5a]">Horarios</h2>
+              <div className="overflow-x-auto">
+                <table className="min-w-full border text-center">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="p-2 border">Día</th>
+                      <th className="p-2 border">Abierto</th>
+                      <th className="p-2 border">Hora Apertura</th>
+                      <th className="p-2 border">Hora Cierre</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {DAYS_OF_WEEK.map((day, i) => {
+                      const schedule = newLocation.schedules[i];
+                      return (
+                        <tr key={i}>
+                          <td className="p-2 border font-medium">{day}</td>
+                          <td className="p-2 border">
+                            <input
+                              type="checkbox"
+                              checked={schedule.isOpen}
+                              onChange={e => {
+                                const updated = [...newLocation.schedules];
+                                updated[i].isOpen = e.target.checked;
+                                setNewLocation({ ...newLocation, schedules: updated });
+                              }}
+                            />
+                          </td>
+                          <td className="p-2 border">
+                            <input
+                              type="text"
+                              value={newHourInputs[i]?.open || format(new Date(schedule.openingTime), 'HH:mm')}
+                              disabled={!schedule.isOpen}
+                              onChange={e => {
+                                setNewHourInputs({ ...newHourInputs, [i]: { ...newHourInputs[i], open: e.target.value } });
+                              }}
+                              onBlur={e => {
+                                const value = e.target.value;
+                                if (/^\d{2}:\d{2}$/.test(value)) {
+                                  const updated = [...newLocation.schedules];
+                                  const date = new Date(schedule.openingTime || new Date());
+                                  const [h, m] = value.split(':');
+                                  date.setHours(parseInt(h), parseInt(m));
+                                  updated[i].openingTime = date.toISOString();
+                                  setNewLocation({ ...newLocation, schedules: updated });
+                                }
+                              }}
+                              placeholder="HH:mm"
+                              maxLength={5}
+                              className="w-20 p-1 border rounded text-center"
+                            />
+                          </td>
+                          <td className="p-2 border">
+                            <input
+                              type="text"
+                              value={newHourInputs[i]?.close || format(new Date(schedule.closingTime), 'HH:mm')}
+                              disabled={!schedule.isOpen}
+                              onChange={e => {
+                                setNewHourInputs({ ...newHourInputs, [i]: { ...newHourInputs[i], close: e.target.value } });
+                              }}
+                              onBlur={e => {
+                                const value = e.target.value;
+                                if (/^\d{2}:\d{2}$/.test(value)) {
+                                  const updated = [...newLocation.schedules];
+                                  const date = new Date(schedule.closingTime || new Date());
+                                  const [h, m] = value.split(':');
+                                  date.setHours(parseInt(h), parseInt(m));
+                                  updated[i].closingTime = date.toISOString();
+                                  setNewLocation({ ...newLocation, schedules: updated });
+                                }
+                              }}
+                              placeholder="HH:mm"
+                              maxLength={5}
+                              className="w-20 p-1 border rounded text-center"
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="text-center text-gray-500 italic">Podrás agregar imágenes una vez creada la sede.</div>
+            <div className="flex justify-end">
+              <button
+                onClick={handleSaveNewLocation}
+                className="bg-[#426a5a] text-white font-bold px-6 py-2 rounded-lg shadow hover:bg-[#7fb685] transition-colors"
+              >
+                Guardar Sede
+              </button>
+            </div>
+          </div>
+        )}
+
+        <Toast 
+          open={toast.open} 
+          message={toast.message} 
+          onClose={() => setToast({ ...toast, open: false })} 
+        />
+      </div>
+    </>
+  );
+} 

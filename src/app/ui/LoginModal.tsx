@@ -2,6 +2,7 @@
 
 import { signIn } from 'next-auth/react';
 import { useState } from 'react';
+import type { AdminLoginModalProps } from '@/lib/types';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -59,13 +60,6 @@ export function LoginModal({ isOpen, onClose, callbackUrl = '/' }: LoginModalPro
 }
 
 // Nuevo modal para login de admin
-interface AdminLoginModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onLogin: (email: string, password: string) => void;
-  error?: string;
-}
-
 export function AdminLoginModal({ isOpen, onClose, onLogin, error }: AdminLoginModalProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
