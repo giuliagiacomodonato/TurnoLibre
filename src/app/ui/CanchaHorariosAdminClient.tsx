@@ -137,8 +137,8 @@ export default function CanchaHorariosAdminClient({ sedes: initialSedes = [], ca
             reglas: (c.availability || []).map((a: any) => ({
               id: Date.now() + Math.random(),
               dia: a.dayOfWeek === null ? "Todos" : DAYS_OF_WEEK[a.dayOfWeek] || "Todos",
-              apertura: new Date(a.openingTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
-              cierre: new Date(a.closingTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
+              apertura: a.openingTime ? new Date(a.openingTime).toISOString().slice(11, 16) : "08:00",
+              cierre: a.closingTime ? new Date(a.closingTime).toISOString().slice(11, 16) : "23:00",
               duracion: a.slotDuration?.toString() || "60",
             })),
           }))
