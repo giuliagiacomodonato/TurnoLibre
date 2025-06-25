@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { Toast } from "../ui/Toast";
 import { AdminHeader } from "../ui/Header";
 import type { CanchaHorariosAdminClientProps } from '@/lib/types';
-import { DAYS_OF_WEEK } from '@/lib/utils';
+import { DAYS_OF_WEEK, DIAS_ORDEN } from '@/lib/utils';
 
 function ReglasHorarios({ reglas, setReglas }: { reglas: any[]; setReglas: (r: any[]) => void }) {
   const [nueva, setNueva] = useState({ dia: "Todos", apertura: "08:00", cierre: "23:00", duracion: "60" });
@@ -76,7 +76,7 @@ function ReglasHorarios({ reglas, setReglas }: { reglas: any[]; setReglas: (r: a
           <label className="block text-[#426a5a] font-semibold mb-1">Día</label>
           <select name="dia" value={nueva.dia} onChange={handleChange} className="rounded-lg border-[#7fb685] px-3 py-2">
             <option value="Todos">Todos</option>
-            {DAYS_OF_WEEK.map(dia => (
+            {DIAS_ORDEN.map(dia => (
               <option key={dia} value={dia}>{dia}</option>
             ))}
           </select>
@@ -136,7 +136,7 @@ export default function CanchaHorariosAdminClient({ sedes: initialSedes = [], ca
             descripcion: c.description || "",
             reglas: (c.availability || []).map((a: any) => ({
               id: Date.now() + Math.random(),
-              dia: a.dayOfWeek === null ? "Todos" : DAYS_OF_WEEK[a.dayOfWeek] || "Todos",
+              dia: a.dayOfWeek === null ? "Todos" : a.dayOfWeek === 7 ? "Feriados" : DIAS_ORDEN[a.dayOfWeek] || "Todos",
               apertura: a.openingTime ? new Date(a.openingTime).toISOString().slice(11, 16) : "08:00",
               cierre: a.closingTime ? new Date(a.closingTime).toISOString().slice(11, 16) : "23:00",
               duracion: a.slotDuration?.toString() || "60",
@@ -242,7 +242,8 @@ export default function CanchaHorariosAdminClient({ sedes: initialSedes = [], ca
       for (const regla of cancha.reglas) {
         let dayOfWeek: number | null = null;
         if (regla.dia === "Todos") dayOfWeek = null;
-        else dayOfWeek = DAYS_OF_WEEK.indexOf(regla.dia);
+        else if (regla.dia === "Feriados") dayOfWeek = 7; // Día 7 para feriados
+        else dayOfWeek = DIAS_ORDEN.indexOf(regla.dia);
         await fetch("/api/facility-availability", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
