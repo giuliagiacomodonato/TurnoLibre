@@ -99,7 +99,7 @@ export default function Home() {
       const [sportsRes, locationsRes, facilitiesRes] = await Promise.all([
         fetch('/api/sports'),
         fetch('/api/locations'),
-        fetch(`/api/facilities?locationId=${selectedLocationId || ''}`)
+        fetch('/api/facilities')
       ]);
 
       const sportsData = await sportsRes.json();
@@ -107,11 +107,11 @@ export default function Home() {
       const facilitiesData = await facilitiesRes.json();
 
       setLocations(locationsData);
-      const initialLocation = locationsData[0] || null;
+      const initialLocation = locationsData[1] || locationsData[0] || null;
       setLocation(initialLocation);
       setSelectedLocationId(initialLocation?.id || '');
 
-      // Relacionar facilities con deportes
+      // Relacionar facilities con deportes - mostrar todos los deportes que tengan canchas
       const sportsWithFacilities = sportsData.map((sport: Sport) => ({
         ...sport,
         facilities: facilitiesData.filter((f: Facility) => f.sportId === sport.id)
@@ -129,21 +129,24 @@ export default function Home() {
     }
   };
 
-  // Cuando cambia la sede seleccionada, actualizar deportes y location
+  // Cuando cambia la sede seleccionada, actualizar location y mantener todos los deportes
   useEffect(() => {
     if (!selectedLocationId || locations.length === 0) return;
     const newLocation = locations.find(l => l.id === selectedLocationId) || null;
     setLocation(newLocation);
+    
+    // Mantener todos los deportes sin filtrar por sede
     fetch('/api/sports').then(res => res.json()).then(sportsData => {
-      const sportsWithFacilities = sportsData.filter((sport: Sport) =>
-        sport.facilities.some((f: Facility) => f.locationId === selectedLocationId)
-      );
-      setSports(sportsWithFacilities);
-      if (sportsWithFacilities.length > 0) {
-        setSelectedSport(sportsWithFacilities[0].id);
-      } else {
-        setSelectedSport('');
-      }
+      fetch('/api/facilities').then(facilitiesRes => facilitiesRes.json()).then(facilitiesData => {
+        const sportsWithFacilities = sportsData.map((sport: Sport) => ({
+          ...sport,
+          facilities: facilitiesData.filter((f: Facility) => f.sportId === sport.id)
+        })).filter((sport: Sport) => sport.facilities.length > 0);
+        setSports(sportsWithFacilities);
+        if (sportsWithFacilities.length > 0 && !selectedSport) {
+          setSelectedSport(sportsWithFacilities[0].id);
+        }
+      });
     });
   }, [selectedLocationId, locations]);
 
@@ -170,7 +173,7 @@ export default function Home() {
   // Function to fetch latest sports data and generate availability
   const updateAvailability = async () => {
     try {
-      const facilitiesRes = await fetch(`/api/facilities?locationId=${selectedLocationId}`);
+      const facilitiesRes = await fetch('/api/facilities'); // Removido el filtro por locationId
       const facilitiesData = await facilitiesRes.json();
       // Agrupar facilities por deporte
       const groupedFacilities: { [sportId: string]: Facility[] } = {};
@@ -198,8 +201,8 @@ export default function Home() {
         const dateString = getLocalDateString(date);
         newAvailability[dateString] = {};
         const dayOfWeek = date.getDay();
-        // Para cada facility
-        for (const facility of facilitiesData.filter((f: Facility) => f.locationId === selectedLocationId)) {
+        // Para cada facility - mostrar todas las canchas sin filtrar por sede
+        for (const facility of facilitiesData) {
           // Buscar availability para ese día
           const avail = (facility.availability || []).find((a: any) => a.dayOfWeek === dayOfWeek);
           if (!avail) continue;
@@ -298,8 +301,8 @@ export default function Home() {
 
   const filteredFacilities = useMemo(() => {
     const sport = sports.find(s => s.id === selectedSport);
-    return sport?.facilities.filter(f => f.locationId === selectedLocationId) || [];
-  }, [selectedSport, sports, selectedLocationId]);
+    return sport?.facilities || [];
+  }, [selectedSport, sports]);
 
   const weekDates = useMemo(() => {
     if (!selectedDate) return [];
@@ -372,9 +375,9 @@ export default function Home() {
   const groupedFacilitiesBySlot = useMemo(() => {
     const sport = sports.find(s => s.id === selectedSport);
     if (!sport) return {};
-    // Agrupar por slotDuration
+    // Agrupar por slotDuration - mostrar todas las canchas sin filtrar por sede
     const groups: { [slotDuration: number]: Facility[] } = {};
-    for (const facility of sport.facilities.filter(f => f.locationId === selectedLocationId)) {
+    for (const facility of sport.facilities) {
       // Tomar el slotDuration del availability del día seleccionado
       const [year, month, day] = selectedDate.split('-').map(Number);
       const dateObj = new Date(year, month - 1, day);
@@ -385,7 +388,7 @@ export default function Home() {
       groups[slotDuration].push(facility);
     }
     return groups;
-  }, [selectedSport, sports, selectedLocationId, selectedDate]);
+  }, [selectedSport, sports, selectedDate]);
 
   // Auto-hide toast after 3 seconds
   useEffect(() => {
@@ -507,7 +510,7 @@ export default function Home() {
                     <div className="min-w-[600px] md:min-w-[900px] lg:min-w-[1100px] w-max">
                       {/* Time Headers dinámicos */}
                       <div className="grid grid-cols-[200px_repeat(18,1fr)] md:grid-cols-[300px_repeat(36,1fr)] gap-1 text-center mb-4">
-                        <div className="col-span-1 font-bold text-[#426a5a]">Cancha</div>
+                        <div className="col-span-1 font-bold text-[#426a5a]">Cancha / Sede</div>
                         {/* Tomar los headers del primer facility del grupo */}
                         {(() => {
                           const facility = facilities[0];
@@ -534,7 +537,8 @@ export default function Home() {
                       {facilities.map(facility => (
                         <div key={facility.id} className="grid grid-cols-[200px_repeat(18,1fr)] md:grid-cols-[300px_repeat(36,1fr)] gap-1 items-center mb-4">
                           <div className="text-xs md:text-sm font-semibold text-[#426a5a] pr-2">
-                            {facility.name}
+                            <div>{facility.name}</div>
+                            <div className="text-xs text-gray-500">{facility.location?.name}</div>
                           </div>
                           {availability[selectedDate]?.[facility.id]?.map(slot => (
                             <div

@@ -123,7 +123,7 @@ export default function CanchaHorariosAdmin() {
   const [selectedSede, setSelectedSede] = useState<string>("");
   const [canchas, setCanchas] = useState<any[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
-  const [nuevo, setNuevo] = useState({ nombre: "", precio: 0, deporte: "", descripcion: "", reglas: [] });
+  const [nuevo, setNuevo] = useState({ nombre: "", precio: "", deporte: "", descripcion: "", reglas: [] });
   const [toast, setToast] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
   const [sports, setSports] = useState<any[]>([]);
 
@@ -143,14 +143,21 @@ export default function CanchaHorariosAdmin() {
     fetch(`/api/facilities?locationId=${selectedSede}`)
       .then(res => res.json())
       .then(data => {
+        console.log('Datos de canchas cargados:', data);
         setCanchas(
           data.map((c: any) => ({
             ...c,
-            nombre: c.nombre ?? c.name ?? "",
-            precio: c.precio ?? c.price ?? 0,
-            deporte: c.deporte ?? c.sport?.name ?? "",
-            descripcion: c.descripcion ?? c.description ?? "",
-            reglas: (c.reglas ?? []).map((r: any) => ({ ...r, duracion: r.duracion?.toString?.() ?? "60" })),
+            nombre: c.name || "",
+            precio: c.price || 0,
+            deporte: c.sport?.name || "",
+            descripcion: c.description || "",
+            reglas: (c.availability || []).map((a: any) => ({
+              id: Date.now() + Math.random(),
+              dia: a.dayOfWeek === null ? "Todos" : diasSemana[a.dayOfWeek] || "Todos",
+              apertura: new Date(a.openingTime).toTimeString().slice(0, 5),
+              cierre: new Date(a.closingTime).toTimeString().slice(0, 5),
+              duracion: a.slotDuration?.toString() || "60",
+            })),
           }))
         );
       });
@@ -165,6 +172,9 @@ export default function CanchaHorariosAdmin() {
 
   // Edición de cancha seleccionada
   const cancha = canchas.find(c => c.id === selected);
+  
+  // Debug: mostrar la cancha seleccionada
+  console.log('Cancha seleccionada:', cancha);
 
   // Handlers CRUD
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -184,13 +194,9 @@ export default function CanchaHorariosAdmin() {
   };
 
   const agregarCancha = async () => {
-    if (!nuevo.nombre || !nuevo.deporte) {
-      setToast({ open: true, message: "Completa todos los campos" });
-      return;
-    }
-    const sportId = getSportIdByName(sports, nuevo.deporte);
-    if (!sportId) {
-      setToast({ open: true, message: "Deporte no válido" });
+    const precio = Number(nuevo.precio);
+    if (!nuevo.nombre || !nuevo.deporte || !nuevo.precio || precio <= 0 || !selectedSede) {
+      setToast({ open: true, message: "Completa todos los campos requeridos (nombre, deporte, precio válido y sede)" });
       return;
     }
     const res = await fetch("/api/facilities", {
@@ -199,18 +205,29 @@ export default function CanchaHorariosAdmin() {
       body: JSON.stringify({
         name: nuevo.nombre,
         description: nuevo.descripcion,
-        price: Number(nuevo.precio),
-        sportId,
+        price: precio,
+        sportName: nuevo.deporte,
         locationId: selectedSede,
       }),
     });
     if (res.ok) {
       setToast({ open: true, message: "Cancha agregada" });
       const data = await res.json();
-      setCanchas([...canchas, data]);
-      setNuevo({ nombre: "", precio: 0, deporte: "", descripcion: "", reglas: [] });
+      // Mapear los datos de la API al formato esperado por el frontend
+      const nuevaCancha = {
+        ...data,
+        nombre: data.name,
+        precio: data.price,
+        deporte: data.sport?.name || "",
+        descripcion: data.description || "",
+        reglas: [],
+      };
+      setCanchas([...canchas, nuevaCancha]);
+      setNuevo({ nombre: "", precio: "", deporte: "", descripcion: "", reglas: [] });
     } else {
-      setToast({ open: true, message: "Error al agregar cancha" });
+      const errorText = await res.text();
+      console.error("Error al agregar cancha:", errorText);
+      setToast({ open: true, message: `Error al agregar cancha: ${errorText}` });
     }
   };
 
@@ -248,7 +265,7 @@ export default function CanchaHorariosAdmin() {
       for (const regla of cancha.reglas) {
         let dayOfWeek: number | null = null;
         if (regla.dia === "Todos") dayOfWeek = null;
-        else dayOfWeek = diasSemana.indexOf(regla.dia) + 1; // Lunes=1, ..., Domingo=7
+        else dayOfWeek = diasSemana.indexOf(regla.dia); // Lunes=0, ..., Domingo=6
         await fetch("/api/facility-availability", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -302,16 +319,12 @@ export default function CanchaHorariosAdmin() {
             <div className="border-t pt-4 mt-4">
               <h3 className="text-lg font-bold text-[#426a5a] mb-2">Agregar nueva cancha</h3>
               <input type="text" name="nombre" placeholder="Nombre" value={nuevo.nombre} onChange={e => setNuevo({ ...nuevo, nombre: e.target.value })} className="mb-2 w-full rounded-lg border-[#7fb685] px-3 py-2" />
-              <input type="number" name="precio" placeholder="Precio" value={nuevo.precio} onChange={e => setNuevo({ ...nuevo, precio: Number(e.target.value) })} className="mb-2 w-full rounded-lg border-[#7fb685] px-3 py-2" />
+              <input type="number" name="precio" placeholder="Precio" value={nuevo.precio} onChange={e => setNuevo({ ...nuevo, precio: e.target.value })} className="mb-2 w-full rounded-lg border-[#7fb685] px-3 py-2" />
               <select name="deporte" value={nuevo.deporte} onChange={e => setNuevo({ ...nuevo, deporte: e.target.value })} className="mb-2 w-full rounded-lg border-[#7fb685] px-3 py-2">
                 <option value="">Seleccionar deporte</option>
-                {/* Puedes cargar deportes desde la API si lo deseas */}
-                <option value="Fútbol 5">Fútbol 5</option>
-                <option value="Fútbol 7">Fútbol 7</option>
-                <option value="Tenis">Tenis</option>
-                <option value="Pádel">Pádel</option>
-                <option value="Basket">Basket</option>
-                <option value="Voley">Voley</option>
+                {sports.map(sport => (
+                  <option key={sport.id} value={sport.name}>{sport.name}</option>
+                ))}
               </select>
               <textarea name="descripcion" placeholder="Descripción" value={nuevo.descripcion} onChange={e => setNuevo({ ...nuevo, descripcion: e.target.value })} className="mb-2 w-full rounded-lg border-[#7fb685] px-3 py-2" />
               <button onClick={agregarCancha} className="w-full bg-[#426a5a] text-white font-bold py-2 rounded-lg shadow hover:bg-[#7fb685] transition-colors">Agregar cancha</button>
@@ -352,12 +365,9 @@ export default function CanchaHorariosAdmin() {
                       className="w-full rounded-lg border-[#7fb685] px-3 py-2"
                     >
                       <option value="">Seleccionar deporte</option>
-                      <option value="Fútbol 5">Fútbol 5</option>
-                      <option value="Fútbol 7">Fútbol 7</option>
-                      <option value="Tenis">Tenis</option>
-                      <option value="Pádel">Pádel</option>
-                      <option value="Basket">Basket</option>
-                      <option value="Voley">Voley</option>
+                      {sports.map(sport => (
+                        <option key={sport.id} value={sport.name}>{sport.name}</option>
+                      ))}
                     </select>
                   </div>
                   <div className="col-span-2">
