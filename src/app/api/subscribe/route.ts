@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import webpush from 'web-push';
 
 let subscriptions: any[] = []; // En producción, guarda en DB
 
@@ -11,5 +12,23 @@ export async function POST(req: Request) {
   return NextResponse.json({ success: true });
 }
 
-// (Opcional) Exporta las suscripciones para usarlas en send-notification
-export { subscriptions };
+export async function GET() {
+  // Devuelve todas las suscripciones (solo para pruebas)
+  return new Response(JSON.stringify(subscriptions), { status: 200 });
+}
+
+webpush.setVapidDetails(
+  'mailto:tu-email@dominio.com',
+  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+  process.env.NEXT_PUBLIC_VAPID_PRIVATE_KEY!
+);
+
+export async function PUT(req: Request) {
+  const { title, body } = await req.json();
+  const payload = JSON.stringify({ title, body });
+  for (const sub of subscriptions) {
+    await webpush.sendNotification(sub, payload);
+  }
+  return new Response(JSON.stringify({ success: true }), { status: 200 });
+}
+
