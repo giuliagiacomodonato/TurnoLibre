@@ -42,6 +42,12 @@ export default function EditarDisponibilidadClient({ facilities: initialFaciliti
     isCurrentlyBlocked: boolean;
     reason: string;
   }>({ open: false, facilityId: "", time: "", isCurrentlyBlocked: false, reason: "" });
+  const [cancelReservationModal, setCancelReservationModal] = useState<{
+    open: boolean;
+    reservationId: string;
+    time: string;
+    userName: string;
+  }>({ open: false, reservationId: "", time: "", userName: "" });
 
   useEffect(() => {
     if (!selectedFacility) return;
@@ -97,11 +103,14 @@ export default function EditarDisponibilidadClient({ facilities: initialFaciliti
             return blockMinutes === slotMinutes;
           });
           const isReservation = blockedReservation && (blockedReservation.status === "CONFIRMED" || blockedReservation.status === "PENDING");
+          const isConfirmedReservation = blockedReservation && blockedReservation.status === "CONFIRMED";
           return { 
             time: slot,
             available: !blockedReservation,
             reason: blockedReservation?.reason || (isReservation ? "Reservado" : undefined),
             isReservation: isReservation,
+            isConfirmedReservation: isConfirmedReservation,
+            reservationId: blockedReservation?.id,
             user: blockedReservation?.user
           };
         });
@@ -148,8 +157,47 @@ export default function EditarDisponibilidadClient({ facilities: initialFaciliti
     });
   };
 
-  const handleSlotClick = (facilityId: string, time: string, isCurrentlyBlocked: boolean) => {
-    setConfirmModal({ open: true, facilityId, time, isCurrentlyBlocked, reason: "" });
+  const handleSlotClick = (facilityId: string, time: string, isCurrentlyBlocked: boolean, slotObj?: any) => {
+    // Si es una reserva confirmada, abrir modal de cancelación
+    if (slotObj?.isConfirmedReservation && slotObj?.reservationId) {
+      setCancelReservationModal({
+        open: true,
+        reservationId: slotObj.reservationId,
+        time: time,
+        userName: slotObj.user?.name || 'Usuario'
+      });
+    } else {
+      // Si no es reserva confirmada, usar el modal de bloqueo normal
+      setConfirmModal({ open: true, facilityId, time, isCurrentlyBlocked, reason: "" });
+    }
+  };
+
+  const handleCancelReservation = async () => {
+    const { reservationId, time } = cancelReservationModal;
+    try {
+      const response = await fetch(`/api/reservations/${reservationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'CANCELLED',
+          reason: 'Cancelado por administrador'
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Error al cancelar la reserva');
+      }
+      
+      await generateAvailability();
+      setToastMessage(`Reserva del horario ${time} cancelada con éxito.`);
+      setShowToast(true);
+    } catch (error) {
+      setToastMessage('Error al cancelar la reserva.');
+      setShowToast(true);
+    } finally {
+      setCancelReservationModal({ open: false, reservationId: "", time: "", userName: "" });
+      setTimeout(() => setShowToast(false), 3000);
+    }
   };
 
   const handleConfirm = async () => {
@@ -287,24 +335,28 @@ export default function EditarDisponibilidadClient({ facilities: initialFaciliti
                       const slotObj = availability[selectedDate]?.[selectedFacility]?.find(s => s.time === time);
                       const tooltipText = slotObj?.available 
                         ? `${time} - Disponible`
-                        : slotObj?.isReservation && slotObj?.user
-                          ? `${time} - Reservado\nUsuario: ${slotObj.user.name}`
-                          : slotObj?.reason 
-                            ? `${time} - Bloqueado\nMotivo: ${slotObj.reason}`
-                            : `${time} - Bloqueado`;
+                        : slotObj?.isConfirmedReservation && slotObj?.user
+                          ? `${time} - Reservado (CONFIRMED)\nUsuario: ${slotObj.user.name}\nHaz clic para cancelar`
+                          : slotObj?.isReservation && slotObj?.user
+                            ? `${time} - Reservado (PENDING)\nUsuario: ${slotObj.user.name}`
+                            : slotObj?.reason 
+                              ? `${time} - Bloqueado\nMotivo: ${slotObj.reason}`
+                              : `${time} - Bloqueado`;
                       return (
                         <div
                           key={time}
                           className={`h-12 rounded-lg flex items-center justify-center text-sm font-semibold transition-colors \
                             ${slotObj?.available 
                               ? 'bg-[#7fb685] hover:bg-[#426a5a] cursor-pointer text-[#426a5a] hover:text-white' 
-                              : slotObj?.isReservation
-                                ? 'bg-blue-200 text-blue-800 cursor-not-allowed' // Reservation style
-                                : 'bg-gray-300 hover:bg-red-400 cursor-pointer text-gray-400' // Blocked style
+                              : slotObj?.isConfirmedReservation
+                                ? 'bg-blue-200 hover:bg-red-200 cursor-pointer text-blue-800 hover:text-red-800' // Confirmed reservation - clickable to cancel
+                                : slotObj?.isReservation
+                                  ? 'bg-blue-200 text-blue-800 cursor-not-allowed' // Pending reservation - not clickable
+                                  : 'bg-gray-300 hover:bg-red-400 cursor-pointer text-gray-400' // Blocked style
                             }`}
                           style={{ minWidth: '4rem' }}
                           title={tooltipText}
-                          onClick={() => slotObj?.isReservation ? null : handleSlotClick(selectedFacility, time, !(slotObj?.available))}
+                          onClick={() => handleSlotClick(selectedFacility, time, !(slotObj?.available), slotObj)}
                         />
                       );
                     });
@@ -314,6 +366,8 @@ export default function EditarDisponibilidadClient({ facilities: initialFaciliti
             </div>
           </div>
         </main>
+        
+        {/* Modal de confirmación para bloquear/desbloquear */}
         {confirmModal.open && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
             <div className="bg-white rounded-lg shadow-xl p-8 max-w-xs w-full flex flex-col items-center">
@@ -357,6 +411,39 @@ export default function EditarDisponibilidadClient({ facilities: initialFaciliti
             </div>
           </div>
         )}
+
+        {/* Modal de confirmación para cancelar reserva */}
+        {cancelReservationModal.open && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div className="bg-white rounded-lg shadow-xl p-8 max-w-xs w-full flex flex-col items-center">
+              <h3 className="text-lg font-bold text-red-600 mb-4 text-center">Cancelar Reserva</h3>
+              <p className="mb-6 text-gray-700 text-center">
+                ¿Estás seguro de que quieres cancelar la reserva del horario <b>{cancelReservationModal.time}</b>?
+              </p>
+              <p className="mb-6 text-sm text-gray-600 text-center">
+                Usuario: <b>{cancelReservationModal.userName}</b>
+              </p>
+              <p className="mb-6 text-xs text-gray-500 text-center">
+                Al cancelar, el horario quedará disponible nuevamente.
+              </p>
+              <div className="flex justify-center gap-2 w-full">
+                <button
+                  className="px-4 py-2 rounded bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  onClick={() => setCancelReservationModal({ open: false, reservationId: "", time: "", userName: "" })}
+                >
+                  No cancelar
+                </button>
+                <button
+                  className="px-4 py-2 rounded font-bold bg-red-500 text-white hover:bg-red-600"
+                  onClick={handleCancelReservation}
+                >
+                  Cancelar Reserva
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        
         <Toast open={showToast} message={toastMessage || ""} onClose={() => setShowToast(false)} />
       </div>
     </>

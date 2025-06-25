@@ -93,6 +93,8 @@ export type Availability = {
       available: boolean;
       reason?: string;
       isReservation?: boolean;
+      isConfirmedReservation?: boolean;
+      reservationId?: string;
       user?: {
         name: string;
         email: string;
