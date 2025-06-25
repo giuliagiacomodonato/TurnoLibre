@@ -10,6 +10,7 @@ interface Reservation {
   startTime: string;
   endTime: string;
   status: string;
+  reason?: string;
   facility: {
     name: string;
     sport: {
@@ -25,9 +26,13 @@ interface Reservation {
 export default function ReservasCliente({ reservas }: { reservas: Reservation[] }) {
   const [activeTab, setActiveTab] = useState<'activas' | 'pasadas' | 'canceladas'>('activas');
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
+  const [localReservations, setLocalReservations] = useState<Reservation[]>(reservas);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
 
   const now = new Date();
-  const filteredReservations = reservas.filter(reservation => {
+  const filteredReservations = localReservations.filter(reservation => {
     const startTime = parseISO(reservation.startTime);
     if (activeTab === 'activas') {
       return reservation.status === 'CONFIRMED' && !isBefore(startTime, now);
@@ -55,6 +60,52 @@ export default function ReservasCliente({ reservas }: { reservas: Reservation[] 
       case 'FAILED': return 'Fallido';
       default: return 'No disponible';
     }
+  };
+
+  const handleCancelReservation = async () => {
+    if (!selectedReservation || !cancelReason.trim()) return;
+    
+    setIsCancelling(true);
+    try {
+      const response = await fetch(`/api/reservations/${selectedReservation.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'CANCELLED',
+          reason: cancelReason.trim()
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Error al cancelar la reserva');
+      }
+      
+      // Update local state
+      setLocalReservations(prev => prev.map(reservation => 
+        reservation.id === selectedReservation.id 
+          ? { ...reservation, status: 'CANCELLED', reason: cancelReason.trim() }
+          : reservation
+      ));
+      
+      // Clear selection and close modal
+      setSelectedReservation(null);
+      setShowCancelModal(false);
+      setCancelReason('');
+      
+      // Show success message (you could add a toast here)
+      alert('Reserva cancelada con éxito');
+      
+    } catch (error) {
+      console.error('Error canceling reservation:', error);
+      alert('Error al cancelar la reserva. Por favor, intenta nuevamente.');
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
+  const openCancelModal = () => {
+    setShowCancelModal(true);
+    setCancelReason('');
   };
 
   return (
@@ -191,8 +242,8 @@ export default function ReservasCliente({ reservas }: { reservas: Reservation[] 
               </div>
               {activeTab === 'activas' && (
                 <button
-                  className="w-full mt-4 py-2 px-4 bg-red-500 hover:bg-red-600 text-white font-medium rounded-lg"
-                  // onClick={() => handleCancelReservation(selectedReservation.id)}
+                  className="w-full mt-4 py-2 px-4 bg-red-500 hover:bg-red-600 text-white font-medium rounded-lg transition-colors"
+                  onClick={openCancelModal}
                 >
                   Cancelar reserva
                 </button>
@@ -211,6 +262,57 @@ export default function ReservasCliente({ reservas }: { reservas: Reservation[] 
           </div>
         )}
       </div>
+
+      {/* Modal de confirmación para cancelar reserva */}
+      {showCancelModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full mx-4">
+            <h3 className="text-lg font-bold text-red-600 mb-4 text-center">Cancelar Reserva</h3>
+            <p className="mb-4 text-gray-700 text-center">
+              ¿Estás seguro de que quieres cancelar tu reserva?
+            </p>
+            <p className="mb-4 text-sm text-gray-600 text-center">
+              <strong>{selectedReservation?.facility.name}</strong><br />
+              {selectedReservation?.date?.slice(0, 10)} - {selectedReservation && format(toZonedTime(parseISO(selectedReservation.startTime), Intl.DateTimeFormat().resolvedOptions().timeZone), 'HH:mm')}hs
+            </p>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Motivo de cancelación *
+              </label>
+              <textarea
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Explica brevemente por qué cancelas la reserva..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#426a5a] focus:border-transparent"
+                rows={3}
+                required
+              />
+            </div>
+            <p className="mb-6 text-xs text-gray-500 text-center">
+              Al cancelar, el horario quedará disponible nuevamente para otros usuarios.
+            </p>
+            <div className="flex justify-center gap-3">
+              <button
+                className="px-4 py-2 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
+                onClick={() => {
+                  setShowCancelModal(false);
+                  setCancelReason('');
+                }}
+                disabled={isCancelling}
+              >
+                No cancelar
+              </button>
+              <button
+                className="px-4 py-2 rounded font-bold bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={handleCancelReservation}
+                disabled={isCancelling || !cancelReason.trim()}
+              >
+                {isCancelling ? 'Cancelando...' : 'Cancelar Reserva'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

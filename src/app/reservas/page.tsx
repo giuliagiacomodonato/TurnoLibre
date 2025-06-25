@@ -11,6 +11,7 @@ interface Reservation {
   startTime: string;
   endTime: string;
   status: string;
+  reason?: string;
   facility: {
     name: string;
     sport: {
@@ -55,6 +56,7 @@ export default async function ReservasPage() {
     });
     reservations = dbReservations.map(r => ({
       ...r,
+      reason: r.reason || undefined,
       date: typeof r.date === 'string' ? r.date : r.date.toISOString(),
       startTime: typeof r.startTime === 'string' ? r.startTime : r.startTime.toISOString(),
       endTime: typeof r.endTime === 'string' ? r.endTime : r.endTime.toISOString(),
