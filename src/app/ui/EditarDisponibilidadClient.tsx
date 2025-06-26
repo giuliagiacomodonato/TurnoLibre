@@ -35,6 +35,7 @@ export default function EditarDisponibilidadClient({ facilities: initialFaciliti
   const [availability, setAvailability] = useState<Availability>({});
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showToast, setShowToast] = useState(false);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [confirmModal, setConfirmModal] = useState<{
     open: boolean;
     facilityId: string;
@@ -63,65 +64,78 @@ export default function EditarDisponibilidadClient({ facilities: initialFaciliti
   }, [selectedFacility, selectedDate]);
 
   const generateAvailability = async () => {
+    setIsLoading(true);
     const newAvailability: Availability = {};
     const facility = facilities.find(f => f.id === selectedFacility);
-    if (!facility || !facility.availability) return;
+    if (!facility || !facility.availability) {
+      setIsLoading(false);
+      return;
+    }
+    
     const [year, month, day] = selectedDate.split('-').map(Number);
     const base = new Date(year, month - 1, day, 12, 0, 0, 0);
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(base);
-      date.setDate(base.getDate() + i);
-      const dateString = getLocalDateString(date);
-      newAvailability[dateString] = {};
-      const dayOfWeek = date.getDay();
-      const avail = (facility.availability || []).find((a) => a.dayOfWeek === dayOfWeek);
-      if (!avail) {
-        newAvailability[dateString][selectedFacility] = [];
-        continue;
-      }
-      const opening = utcToLocal(avail.openingTime);
-      const closing = utcToLocal(avail.closingTime);
-      const slotDuration = avail.slotDuration;
-      const timeSlots: string[] = [];
-      let current = new Date(opening.getTime());
-      while (current < closing) {
-        timeSlots.push(current.toTimeString().slice(0,5));
-        current = new Date(current.getTime() + slotDuration * 60000);
-      }
-      try {
-        const res = await fetch(`/api/availability/blocks?date=${dateString}&facilityId=${selectedFacility}`);
-        let blocks = await res.json();
-        if (!Array.isArray(blocks)) blocks = [];
-        newAvailability[dateString][selectedFacility] = timeSlots.map(slot => {
-          const slotMinutes = getMinutesFromTimeString(slot);
-          const blockedReservation = blocks.find((block: any) => {
-            if (block.status !== "BLOCKED" && block.status !== "CONFIRMED" && block.status !== "PENDING") return false;
-            const blockStart = new Date(block.startTime);
-            const blockHour = blockStart.getHours();
-            const blockMinute = blockStart.getMinutes();
-            const blockMinutes = blockHour * 60 + blockMinute;
-            return blockMinutes === slotMinutes;
+    
+    try {
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(base);
+        date.setDate(base.getDate() + i);
+        const dateString = getLocalDateString(date);
+        newAvailability[dateString] = {};
+        const dayOfWeek = date.getDay();
+        const avail = (facility.availability || []).find((a) => a.dayOfWeek === dayOfWeek);
+        if (!avail) {
+          newAvailability[dateString][selectedFacility] = [];
+          continue;
+        }
+        
+        const opening = utcToLocal(avail.openingTime);
+        const closing = utcToLocal(avail.closingTime);
+        const slotDuration = avail.slotDuration;
+        const timeSlots: string[] = [];
+        let current = new Date(opening.getTime());
+        while (current < closing) {
+          timeSlots.push(current.toTimeString().slice(0,5));
+          current = new Date(current.getTime() + slotDuration * 60000);
+        }
+        try {
+          const res = await fetch(`/api/availability/blocks?date=${dateString}&facilityId=${selectedFacility}`);
+          let blocks = await res.json();
+          if (!Array.isArray(blocks)) blocks = [];
+          newAvailability[dateString][selectedFacility] = timeSlots.map(slot => {
+            const slotMinutes = getMinutesFromTimeString(slot);
+            const blockedReservation = blocks.find((block: any) => {
+              if (block.status !== "BLOCKED" && block.status !== "CONFIRMED" && block.status !== "PENDING") return false;
+              const blockStart = new Date(block.startTime);
+              const blockHour = blockStart.getHours();
+              const blockMinute = blockStart.getMinutes();
+              const blockMinutes = blockHour * 60 + blockMinute;
+              return blockMinutes === slotMinutes;
+            });
+            const isReservation = blockedReservation && (blockedReservation.status === "CONFIRMED" || blockedReservation.status === "PENDING");
+            const isConfirmedReservation = blockedReservation && blockedReservation.status === "CONFIRMED";
+            return { 
+              time: slot,
+              available: !blockedReservation,
+              reason: blockedReservation?.reason || (isReservation ? "Reservado" : undefined),
+              isReservation: isReservation,
+              isConfirmedReservation: isConfirmedReservation,
+              reservationId: blockedReservation?.id,
+              user: blockedReservation?.user
+            };
           });
-          const isReservation = blockedReservation && (blockedReservation.status === "CONFIRMED" || blockedReservation.status === "PENDING");
-          const isConfirmedReservation = blockedReservation && blockedReservation.status === "CONFIRMED";
-          return { 
-            time: slot,
-            available: !blockedReservation,
-            reason: blockedReservation?.reason || (isReservation ? "Reservado" : undefined),
-            isReservation: isReservation,
-            isConfirmedReservation: isConfirmedReservation,
-            reservationId: blockedReservation?.id,
-            user: blockedReservation?.user
-          };
-        });
-      } catch (error) {
-        newAvailability[dateString][selectedFacility] = timeSlots.map(time => ({
-          time,
-          available: true
-        }));
+        } catch (error) {
+          newAvailability[dateString][selectedFacility] = timeSlots.map(time => ({
+            time,
+            available: true
+          }));
+        }
       }
+      setAvailability(newAvailability);
+    } catch (error) {
+      console.error('Error updating availability:', error);
+    } finally {
+      setIsLoading(false);
     }
-    setAvailability(newAvailability);
   };
 
   const handlePreviousDay = () => {
@@ -239,7 +253,7 @@ export default function EditarDisponibilidadClient({ facilities: initialFaciliti
   return (
     <>
       <AdminHeader />
-      <div className="min-h-screen bg-[#426a5a]">
+      <div className="min-h-screen bg-white">
         <main className="container mx-auto px-4 py-8">
           <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-6">
             <h1 className="text-2xl font-bold text-[#426a5a] mb-6">Editar Disponibilidad</h1>
@@ -251,6 +265,7 @@ export default function EditarDisponibilidadClient({ facilities: initialFaciliti
                 value={selectedFacility}
                 onChange={(e) => setSelectedFacility(e.target.value)}
                 className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#426a5a] focus:border-transparent"
+                disabled={isLoading}
               >
                 {facilities.map((facility) => (
                   <option key={facility.id} value={facility.id}>
@@ -262,8 +277,9 @@ export default function EditarDisponibilidadClient({ facilities: initialFaciliti
             <div className="mb-6 flex items-center justify-between">
               <button
                 onClick={handlePreviousDay}
-                className="p-2 rounded-lg hover:bg-[#7fb685]/20 transition-colors"
+                className={`p-2 rounded-lg hover:bg-[#7fb685]/20 transition-colors ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                 title="Día anterior"
+                disabled={isLoading}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-[#426a5a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -274,8 +290,9 @@ export default function EditarDisponibilidadClient({ facilities: initialFaciliti
               </h2>
               <button
                 onClick={handleNextDay}
-                className="p-2 rounded-lg hover:bg-[#7fb685]/20 transition-colors"
+                className={`p-2 rounded-lg hover:bg-[#7fb685]/20 transition-colors ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                 title="Día siguiente"
+                disabled={isLoading}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-[#426a5a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -283,87 +300,108 @@ export default function EditarDisponibilidadClient({ facilities: initialFaciliti
               </button>
             </div>
             <div className="overflow-x-auto">
-              <div className="w-full min-w-[800px]">
-                <div className="grid grid-cols-[200px_repeat(36,minmax(4rem,1fr))] gap-1 text-center mb-4">
-                  <div className="col-span-1 font-bold text-[#426a5a]">Horario</div>
-                  {(() => {
-                    const facility = facilities.find(f => f.id === selectedFacility);
-                    if (!facility || !facility.availability) return null;
-                    const [year, month, day] = selectedDate.split('-').map(Number);
-                    const dateObj = new Date(year, month - 1, day);
-                    const dayOfWeek = dateObj.getDay();
-                    const avail = (facility.availability || []).find((a) => a.dayOfWeek === dayOfWeek);
-                    if (!avail) return null;
-                    const opening = utcToLocal(avail.openingTime);
-                    const closing = utcToLocal(avail.closingTime);
-                    const slotDuration = avail.slotDuration;
-                    const headers = [];
-                    let current = new Date(opening.getTime());
-                    while (current < closing) {
-                      headers.push(current.toTimeString().slice(0,5));
-                      current = new Date(current.getTime() + slotDuration * 60000);
-                    }
-                    return headers.map(time => (
-                      <div key={time} className="font-bold text-[#426a5a] w-full">
-                        {time}
-                      </div>
-                    ));
-                  })()}
-                </div>
-                <div className="grid grid-cols-[200px_repeat(36,minmax(4rem,1fr))] gap-1 items-center">
-                  <div className="text-sm font-semibold text-[#426a5a] pr-2">
-                    {facilities.find(f => f.id === selectedFacility)?.name}
+              {isLoading ? (
+                // Skeleton loader
+                <div className="w-full min-w-[800px] animate-pulse">
+                  <div className="grid grid-cols-[200px_repeat(36,minmax(4rem,1fr))] gap-1 text-center mb-4">
+                    <div className="col-span-1 h-6 bg-gray-200 rounded"></div>
+                    {Array(12).fill(0).map((_, i) => (
+                      <div key={i} className="h-6 bg-gray-200 rounded"></div>
+                    ))}
                   </div>
-                  {(() => {
-                    const facility = facilities.find(f => f.id === selectedFacility);
-                    if (!facility || !facility.availability) return null;
-                    const [year, month, day] = selectedDate.split('-').map(Number);
-                    const dateObj = new Date(year, month - 1, day);
-                    const dayOfWeek = dateObj.getDay();
-                    const avail = (facility.availability || []).find((a) => a.dayOfWeek === dayOfWeek);
-                    if (!avail) return null;
-                    const opening = utcToLocal(avail.openingTime);
-                    const closing = utcToLocal(avail.closingTime);
-                    const slotDuration = avail.slotDuration;
-                    const slots = [];
-                    let current = new Date(opening.getTime());
-                    while (current < closing) {
-                      slots.push(current.toTimeString().slice(0,5));
-                      current = new Date(current.getTime() + slotDuration * 60000);
-                    }
-                    return slots.map(time => {
-                      const slotObj = availability[selectedDate]?.[selectedFacility]?.find(s => s.time === time);
-                      const tooltipText = slotObj?.available 
-                        ? `${time} - Disponible`
-                        : slotObj?.isConfirmedReservation && slotObj?.user
-                          ? `${time} - Reservado (CONFIRMED)\nUsuario: ${slotObj.user.name}\nHaz clic para cancelar`
-                          : slotObj?.isReservation && slotObj?.user
-                            ? `${time} - Reservado (PENDING)\nUsuario: ${slotObj.user.name}`
-                            : slotObj?.reason 
-                              ? `${time} - Bloqueado\nMotivo: ${slotObj.reason}`
-                              : `${time} - Bloqueado`;
-                      return (
-                        <div
-                          key={time}
-                          className={`h-12 rounded-lg flex items-center justify-center text-sm font-semibold transition-colors \
-                            ${slotObj?.available 
-                              ? 'bg-[#7fb685] hover:bg-[#426a5a] cursor-pointer text-[#426a5a] hover:text-white' 
-                              : slotObj?.isConfirmedReservation
-                                ? 'bg-blue-200 hover:bg-red-200 cursor-pointer text-blue-800 hover:text-red-800' // Confirmed reservation - clickable to cancel
-                                : slotObj?.isReservation
-                                  ? 'bg-blue-200 text-blue-800 cursor-not-allowed' // Pending reservation - not clickable
-                                  : 'bg-gray-300 hover:bg-red-400 cursor-pointer text-gray-400' // Blocked style
-                            }`}
-                          style={{ minWidth: '4rem' }}
-                          title={tooltipText}
-                          onClick={() => handleSlotClick(selectedFacility, time, !(slotObj?.available), slotObj)}
-                        />
-                      );
-                    });
-                  })()}
+                  <div className="grid grid-cols-[200px_repeat(36,minmax(4rem,1fr))] gap-1 items-center">
+                    <div className="h-10 bg-gray-200 rounded"></div>
+                    {Array(12).fill(0).map((_, i) => (
+                      <div key={i} className="h-12 bg-gray-200 rounded" style={{ minWidth: '4rem' }}></div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="w-full min-w-[800px]">
+                  <div className="grid grid-cols-[200px_repeat(36,minmax(4rem,1fr))] gap-1 text-center mb-4">
+                    <div className="col-span-1 font-bold text-[#426a5a]">Horario</div>
+                    {(() => {
+                      const facility = facilities.find(f => f.id === selectedFacility);
+                      if (!facility || !facility.availability) return null;
+                      const [year, month, day] = selectedDate.split('-').map(Number);
+                      const dateObj = new Date(year, month - 1, day);
+                      const dayOfWeek = dateObj.getDay();
+                      const avail = (facility.availability || []).find((a) => a.dayOfWeek === dayOfWeek);
+                      if (!avail) return null;
+                      const opening = utcToLocal(avail.openingTime);
+                      const closing = utcToLocal(avail.closingTime);
+                      const slotDuration = avail.slotDuration;
+                      const headers = [];
+                      let current = new Date(opening.getTime());
+                      while (current < closing) {
+                        headers.push(current.toTimeString().slice(0,5));
+                        current = new Date(current.getTime() + slotDuration * 60000);
+                      }
+                      return headers.map(time => (
+                        <div key={time} className="font-bold text-[#426a5a] w-full">
+                          {time}
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                  <div className="grid grid-cols-[200px_repeat(36,minmax(4rem,1fr))] gap-1 items-center">
+                    <div className="text-sm font-semibold text-[#426a5a] pr-2">
+                      {facilities.find(f => f.id === selectedFacility)?.name}
+                    </div>
+                    {(() => {
+                      const facility = facilities.find(f => f.id === selectedFacility);
+                      if (!facility || !facility.availability) return null;
+                      const [year, month, day] = selectedDate.split('-').map(Number);
+                      const dateObj = new Date(year, month - 1, day);
+                      const dayOfWeek = dateObj.getDay();
+                      const avail = (facility.availability || []).find((a) => a.dayOfWeek === dayOfWeek);
+                      if (!avail) return null;
+                      const opening = utcToLocal(avail.openingTime);
+                      const closing = utcToLocal(avail.closingTime);
+                      const slotDuration = avail.slotDuration;
+                      const slots = [];
+                      let current = new Date(opening.getTime());
+                      while (current < closing) {
+                        slots.push(current.toTimeString().slice(0,5));
+                        current = new Date(current.getTime() + slotDuration * 60000);
+                      }
+                      return slots.map(time => {
+                        const slotObj = availability[selectedDate]?.[selectedFacility]?.find(s => s.time === time);
+                        const tooltipText = slotObj?.available 
+                          ? `${time} - Disponible`
+                          : slotObj?.isConfirmedReservation && slotObj?.user
+                            ? `${time} - Reservado (CONFIRMED)\nUsuario: ${slotObj.user.name}\nHaz clic para cancelar`
+                            : slotObj?.isReservation && slotObj?.user
+                              ? `${time} - Reservado (PENDING)\nUsuario: ${slotObj.user.name}`
+                              : slotObj?.reason 
+                                ? `${time} - Bloqueado\nMotivo: ${slotObj.reason}`
+                                : `${time} - Bloqueado`;
+                        return (
+                          <div
+                            key={time}
+                            className={`h-12 rounded-lg flex items-center justify-center text-sm font-semibold transition-colors \
+                              ${slotObj?.available 
+                                ? 'bg-[#7fb685] hover:bg-[#426a5a] cursor-pointer text-[#426a5a] hover:text-white' 
+                                : slotObj?.isConfirmedReservation
+                                  ? 'bg-blue-200 hover:bg-red-200 cursor-pointer text-blue-800 hover:text-red-800' // Confirmed reservation - clickable to cancel
+                                  : slotObj?.isReservation
+                                    ? 'bg-blue-200 text-blue-800 cursor-not-allowed' // Pending reservation - not clickable
+                                    : 'bg-gray-300 hover:bg-red-400 cursor-pointer text-gray-400' // Blocked style
+                            }`}
+                            style={{ minWidth: '4rem' }}
+                            title={tooltipText}
+                            onClick={() => handleSlotClick(selectedFacility, time, !(slotObj?.available), slotObj)}
+                          />
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+              )}
             </div>
+            
+            {/* Remove the loading indicator that appears in the skeleton */}
+            {/* Keep the grid content as is */}
           </div>
         </main>
         
@@ -445,7 +483,17 @@ export default function EditarDisponibilidadClient({ facilities: initialFaciliti
         )}
         
         <Toast open={showToast} message={toastMessage || ""} onClose={() => setShowToast(false)} />
+
+        {/* Loading indicator in bottom right - keep this one */}
+        {isLoading && !showToast && (
+          <div className="fixed bottom-4 right-4 bg-[#426a5a] text-white px-6 py-3 rounded-lg shadow-lg z-40">
+            <div className="flex items-center">
+              <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              Cargando disponibilidad...
+            </div>
+          </div>
+        )}
       </div>
     </>
   );
-} 
+}

@@ -90,7 +90,7 @@ export function Header() {
                 <Link href="/reservas" className="text-[#426a5a] text-lg font-semibold hover:text-[#7fb685] transition-colors" onClick={() => setMenuOpen(false)}>
                   Mis Reservas
                 </Link>
-                <Link href="/inicio/carrito" className="text-[#426a5a] text-lg font-semibold hover:text-[#7fb685] transition-colors" onClick={() => setMenuOpen(false)}>
+                <Link href="/carrito" className="text-[#426a5a] text-lg font-semibold hover:text-[#7fb685] transition-colors" onClick={() => setMenuOpen(false)}>
                   Carrito
                 </Link>
                 <Link href="/FAQ" className="text-[#426a5a] text-lg font-semibold hover:text-[#7fb685] transition-colors" onClick={() => setMenuOpen(false)}>
