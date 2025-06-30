@@ -7,31 +7,16 @@ import type { CloudinaryUploadProps } from '@/lib/types';
 export function CloudinaryUpload({ onUploadSuccess, onUploadError, locationId }: CloudinaryUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
 
-  const handleUpload = async (result: any) => {
+  const handleUpload = (result: any) => {
     if (result.event === 'success') {
       setIsUploading(true);
       try {
-        const response = await fetch('/api/images', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            link: result.info.secure_url,
-            locationId: locationId,
-          }),
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || 'Error al guardar la imagen');
-        }
-
-        onUploadSuccess(result.info.secure_url, '¡Imagen subida y guardada correctamente!');
+        onUploadSuccess(result.info.secure_url);
       } catch (error) {
-        onUploadError?.(error instanceof Error ? error.message : 'Error al guardar la imagen');
+        onUploadError?.(error instanceof Error ? error.message : 'Error al procesar la imagen');
       } finally {
         setIsUploading(false);
+        document.body.style.overflow = 'auto'; // Asegura que el scroll se restaure
       }
     }
   };

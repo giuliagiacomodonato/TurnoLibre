@@ -1,8 +1,9 @@
 "use client";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { format, parseISO, isBefore } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toZonedTime } from 'date-fns-tz';
+import { Toast } from './Toast';
 
 interface Reservation {
   id: string;
@@ -30,6 +31,7 @@ export default function ReservasCliente({ reservas }: { reservas: Reservation[] 
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
+  const [toast, setToast] = useState({ open: false, message: '' });
 
   const now = new Date();
   const filteredReservations = localReservations.filter(reservation => {
@@ -91,13 +93,11 @@ export default function ReservasCliente({ reservas }: { reservas: Reservation[] 
       setSelectedReservation(null);
       setShowCancelModal(false);
       setCancelReason('');
-      
-      // Show success message (you could add a toast here)
-      alert('Reserva cancelada con éxito');
+      setToast({ open: true, message: 'Reserva cancelada con éxito' });
       
     } catch (error) {
       console.error('Error canceling reservation:', error);
-      alert('Error al cancelar la reserva. Por favor, intenta nuevamente.');
+      setToast({ open: true, message: 'Error al cancelar la reserva. Por favor, intenta nuevamente.' });
     } finally {
       setIsCancelling(false);
     }
@@ -107,6 +107,15 @@ export default function ReservasCliente({ reservas }: { reservas: Reservation[] 
     setShowCancelModal(true);
     setCancelReason('');
   };
+
+  useEffect(() => {
+    if (toast.open) {
+      const timer = setTimeout(() => {
+        setToast(t => ({ ...t, open: false }));
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast.open]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -313,6 +322,8 @@ export default function ReservasCliente({ reservas }: { reservas: Reservation[] 
           </div>
         </div>
       )}
+
+      <Toast open={toast.open} message={toast.message} onClose={() => setToast({ ...toast, open: false })} />
     </div>
   );
 } 

@@ -85,3 +85,26 @@ export async function DELETE(
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  try {
+    const location = await prisma.location.findUnique({
+      where: { id },
+      include: {
+        images: true,
+        schedules: true,
+      },
+    });
+    if (!location) {
+      return NextResponse.json({ error: 'Sede no encontrada' }, { status: 404 });
+    }
+    return NextResponse.json(location);
+  } catch (error) {
+    console.error('Error fetching location:', error);
+    return NextResponse.json({ error: 'Error al obtener la sede' }, { status: 500 });
+  }
+}

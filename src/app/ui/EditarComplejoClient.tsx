@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { Toast } from "./Toast";
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -7,6 +7,7 @@ import { AdminHeader } from "./Header";
 import { CloudinaryUpload } from "./CloudinaryUpload";
 import type { Location, LocationSchedule } from '@/lib/types';
 import { DAYS_OF_WEEK } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 
 export default function EditarComplejoClient({ locations: initialLocations }: { locations: Location[] }) {
   const [locations, setLocations] = useState<Location[]>(initialLocations);
@@ -42,6 +43,11 @@ export default function EditarComplejoClient({ locations: initialLocations }: { 
     description: selectedLocation?.description || ""
   });
   const [hourInputs, setHourInputs] = useState<{ [key: string]: { open: string; close: string } }>({});
+  const [openSection, setOpenSection] = useState<string | null>(null);
+  const [pendingImages, setPendingImages] = useState<{ link: string }[]>([]);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [imageToDelete, setImageToDelete] = useState<string | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     if (selectedLocation) {
@@ -66,6 +72,13 @@ export default function EditarComplejoClient({ locations: initialLocations }: { 
     });
     setHourInputs(initial);
   }, [editingSchedules]);
+
+  useEffect(() => {
+    document.body.style.overflow = 'auto';
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, []);
 
   const handleLocationChange = (locationId: string) => {
     if (locationId === 'create') {
@@ -118,22 +131,77 @@ export default function EditarComplejoClient({ locations: initialLocations }: { 
   };
 
   const handleDeleteImage = async (imageId: string) => {
-    if (!selectedLocation) return;
+    setImageToDelete(imageId);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteImage = async () => {
+    if (!selectedLocation || !imageToDelete) return;
     try {
-      const response = await fetch(`/api/images?id=${imageId}`, {
+      const response = await fetch(`/api/images?id=${imageToDelete}`, {
         method: 'DELETE',
       });
       if (!response.ok) {
         throw new Error('Error al eliminar la imagen');
       }
-      const updatedImages = (selectedLocation.images ?? []).filter(img => img.id !== imageId);setSelectedLocation({ ...selectedLocation, images: updatedImages });
-      setToast({ open: true, message: "Imagen eliminada exitosamente" });
+      const updatedImages = (selectedLocation.images ?? []).filter(img => img.id !== imageToDelete);
+      setSelectedLocation({ ...selectedLocation, images: updatedImages });
+      setToast({ open: true, message: 'Imagen eliminada exitosamente' });
     } catch (error) {
-      setToast({ open: true, message: error instanceof Error ? error.message : "Error al eliminar la imagen" });
+      setToast({ open: true, message: error instanceof Error ? error.message : 'Error al eliminar la imagen' });
+    } finally {
+      setShowDeleteModal(false);
+      setImageToDelete(null);
     }
   };
 
-  const handleSave = async () => {
+  const cancelDeleteImage = () => {
+    setShowDeleteModal(false);
+    setImageToDelete(null);
+  };
+
+  const handleSaveInfo = async () => {
+    if (!selectedLocation) return;
+    try {
+      const response = await fetch(`/api/locations/${selectedLocation.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editedInfo.name,
+          address: editedInfo.address,
+          phone: editedInfo.phone,
+          description: editedInfo.description,
+        }),
+      });
+      if (!response.ok) throw new Error('Error al guardar la información general');
+      const updatedLocation = await response.json();
+      setLocations(locations.map(loc => loc.id === updatedLocation.id ? updatedLocation : loc));
+      setSelectedLocation(updatedLocation);
+      setToast({ open: true, message: 'Información general guardada' });
+    } catch (err) {
+      setToast({ open: true, message: err instanceof Error ? err.message : 'Error al guardar' });
+    }
+  };
+
+  const handleSaveServices = async () => {
+    if (!selectedLocation) return;
+    try {
+      const response = await fetch(`/api/locations/${selectedLocation.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ services: selectedLocation.services }),
+      });
+      if (!response.ok) throw new Error('Error al guardar los servicios');
+      const updatedLocation = await response.json();
+      setLocations(locations.map(loc => loc.id === updatedLocation.id ? updatedLocation : loc));
+      setSelectedLocation(updatedLocation);
+      setToast({ open: true, message: 'Servicios guardados' });
+    } catch (err) {
+      setToast({ open: true, message: err instanceof Error ? err.message : 'Error al guardar' });
+    }
+  };
+
+  const handleSaveSchedules = async () => {
     if (!selectedLocation) return;
     try {
       const invalidSchedules = editingSchedules.filter(schedule => {
@@ -143,39 +211,29 @@ export default function EditarComplejoClient({ locations: initialLocations }: { 
         return opening >= closing;
       });
       if (invalidSchedules.length > 0) {
-        setToast({ open: true, message: "Los horarios de cierre deben ser posteriores a los de apertura" });
+        setToast({ open: true, message: 'Los horarios de cierre deben ser posteriores a los de apertura' });
         return;
       }
-      const updateData = {
-        name: editedInfo.name,
-        address: editedInfo.address,
-        phone: editedInfo.phone,
-        description: editedInfo.description,
-        services: selectedLocation.services,
-        schedules: editingSchedules.map(schedule => ({
-          dayOfWeek: schedule.dayOfWeek,
-          isOpen: schedule.isOpen,
-          openingTime: schedule.openingTime,
-          closingTime: schedule.closingTime
-        }))
-      };
       const response = await fetch(`/api/locations/${selectedLocation.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updateData),
+        body: JSON.stringify({
+          schedules: editingSchedules.map(schedule => ({
+            dayOfWeek: schedule.dayOfWeek,
+            isOpen: schedule.isOpen,
+            openingTime: schedule.openingTime,
+            closingTime: schedule.closingTime
+          }))
+        }),
       });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al guardar los cambios');
-      }
+      if (!response.ok) throw new Error('Error al guardar los horarios');
       const updatedLocation = await response.json();
       setLocations(locations.map(loc => loc.id === updatedLocation.id ? updatedLocation : loc));
       setSelectedLocation(updatedLocation);
       setEditingSchedules(updatedLocation.schedules ?? []);
-      setIsEditing(false);
-      setToast({ open: true, message: "Cambios guardados exitosamente" });
+      setToast({ open: true, message: 'Horarios guardados' });
     } catch (err) {
-      setToast({ open: true, message: err instanceof Error ? err.message : "Error al guardar los cambios" });
+      setToast({ open: true, message: err instanceof Error ? err.message : 'Error al guardar' });
     }
   };
 
@@ -229,35 +287,59 @@ export default function EditarComplejoClient({ locations: initialLocations }: { 
     }
   };
 
+  const handleSaveImage = async (imgLink: string) => {
+    if (!selectedLocation?.id) return;
+    try {
+      const res = await fetch('/api/images', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ link: imgLink, locationId: selectedLocation.id }),
+      });
+      if (!res.ok) throw new Error('Error al guardar la imagen');
+      setPendingImages(imgs => imgs.filter(img => img.link !== imgLink));
+      setToast({ open: true, message: 'Imagen guardada correctamente' });
+      router.refresh();
+
+      // Fetch location actualizado
+      const updatedRes = await fetch(`/api/locations/${selectedLocation.id}`);
+      if (updatedRes.ok) {
+        const updatedLocation = await updatedRes.json();
+        setSelectedLocation(updatedLocation);
+        setLocations(locs =>
+          locs.map(loc => loc.id === updatedLocation.id ? updatedLocation : loc)
+        );
+      }
+    } catch (err) {
+      setToast({ open: true, message: err instanceof Error ? err.message : 'Error al guardar la imagen' });
+    }
+  };
+
   // Renderizado
   return (
-    <>
+    <Fragment>
       <AdminHeader />
-      <div className="container mx-auto p-4">
+      <div className="max-w-2xl mx-auto p-6">
         <h1 className="text-2xl font-bold mb-6 text-[#426a5a]">Editar Complejo</h1>
-        {/* Selector de Sede */}
+        {/* Selector de complejo */}
         <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Seleccionar Sede
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Seleccionar complejo</label>
           <select
+            value={selectedLocation?.id || ''}
+            onChange={e => handleLocationChange(e.target.value)}
             className="w-full p-2 border rounded-md"
-            value={isCreating ? 'create' : (selectedLocation?.id || "")}
-            onChange={(e) => handleLocationChange(e.target.value)}
           >
-            {locations.map((location) => (
-              <option key={location.id} value={location.id}>
-                {location.name}
-              </option>
+            {locations.map(loc => (
+              <option key={loc.id} value={loc.id}>{loc.name}</option>
             ))}
-            <option value="create">Crear Sede</option>
           </select>
         </div>
-
-        {selectedLocation && (
-          <div className="space-y-6">
-            {/* Información General */}
-            <div className="bg-white p-6 rounded-lg shadow">
+        {/* Accordion: Información general */}
+        <div className="mb-4 border rounded-lg">
+          <button className="w-full text-left px-4 py-3 font-semibold text-[#426a5a] bg-[#f5f5f5] rounded-t-lg focus:outline-none" onClick={() => setOpenSection(openSection === 'info' ? null : 'info')}>
+            Información general
+          </button>
+          {openSection === 'info' && (
+            <div className="p-4 bg-white rounded-b-lg">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-semibold text-[#426a5a]">Información General</h2>
                 <button
@@ -278,7 +360,7 @@ export default function EditarComplejoClient({ locations: initialLocations }: { 
                       className="w-full p-2 border rounded-md"
                     />
                   ) : (
-                    <p className="font-medium">{selectedLocation.name}</p>
+                    <p className="font-medium">{selectedLocation?.name}</p>
                   )}
                 </div>
                 <div>
@@ -291,7 +373,7 @@ export default function EditarComplejoClient({ locations: initialLocations }: { 
                       className="w-full p-2 border rounded-md"
                     />
                   ) : (
-                    <p className="font-medium">{selectedLocation.address}</p>
+                    <p className="font-medium">{selectedLocation?.address}</p>
                   )}
                 </div>
                 <div>
@@ -304,7 +386,7 @@ export default function EditarComplejoClient({ locations: initialLocations }: { 
                       className="w-full p-2 border rounded-md"
                     />
                   ) : (
-                    <p className="font-medium">{selectedLocation.phone}</p>
+                    <p className="font-medium">{selectedLocation?.phone}</p>
                   )}
                 </div>
                 <div>
@@ -317,15 +399,21 @@ export default function EditarComplejoClient({ locations: initialLocations }: { 
                       rows={3}
                     />
                   ) : (
-                    <p className="font-medium">{selectedLocation.description || "Sin descripción"}</p>
+                    <p className="font-medium">{selectedLocation?.description || "Sin descripción"}</p>
                   )}
                 </div>
               </div>
+              <button onClick={handleSaveInfo} className="mt-4 px-4 py-2 rounded-full bg-[#426a5a] text-[#f2c57c] font-semibold hover:bg-[#2d473a] transition-colors">Guardar cambios</button>
             </div>
-
-            {/* Servicios */}
-            <div className="bg-white p-6 rounded-lg shadow">
-              <h2 className="text-xl font-semibold mb-4 text-[#426a5a]">Servicios</h2>
+          )}
+        </div>
+        {/* Accordion: Servicios */}
+        <div className="mb-4 border rounded-lg">
+          <button className="w-full text-left px-4 py-3 font-semibold text-[#426a5a] bg-[#f5f5f5] rounded-t-lg focus:outline-none" onClick={() => setOpenSection(openSection === 'servicios' ? null : 'servicios')}>
+            Servicios
+          </button>
+          {openSection === 'servicios' && (
+            <div className="p-4 bg-white rounded-b-lg">
               <div className="mb-4">
                 <div className="flex gap-2">
                   <input
@@ -350,7 +438,7 @@ export default function EditarComplejoClient({ locations: initialLocations }: { 
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
-                {(selectedLocation.services ?? []).map((service, index) => (
+                {(selectedLocation?.services ?? []).map((service, index) => (
                   <div
                     key={index}
                     className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full"
@@ -365,11 +453,17 @@ export default function EditarComplejoClient({ locations: initialLocations }: { 
                   </div>
                 ))}
               </div>
+              <button onClick={handleSaveServices} className="mt-4 px-4 py-2 rounded-full bg-[#426a5a] text-[#f2c57c] font-semibold hover:bg-[#2d473a] transition-colors">Guardar cambios</button>
             </div>
-
-            {/* Horarios */}
-            <div className="bg-white p-6 rounded-lg shadow">
-              <h2 className="text-xl font-semibold mb-4 text-[#426a5a]">Horarios</h2>
+          )}
+        </div>
+        {/* Accordion: Horarios */}
+        <div className="mb-4 border rounded-lg">
+          <button className="w-full text-left px-4 py-3 font-semibold text-[#426a5a] bg-[#f5f5f5] rounded-t-lg focus:outline-none" onClick={() => setOpenSection(openSection === 'horarios' ? null : 'horarios')}>
+            Horarios
+          </button>
+          {openSection === 'horarios' && (
+            <div className="p-4 bg-white rounded-b-lg">
               <div className="overflow-x-auto">
                 <table className="min-w-full border text-center">
                   <thead>
@@ -562,244 +656,94 @@ export default function EditarComplejoClient({ locations: initialLocations }: { 
                   </tbody>
                 </table>
               </div>
+              <button onClick={handleSaveSchedules} className="mt-4 px-4 py-2 rounded-full bg-[#426a5a] text-[#f2c57c] font-semibold hover:bg-[#2d473a] transition-colors">Guardar cambios</button>
             </div>
-
-            {/* Gestión de Imágenes */}
-            <div className="bg-white p-6 rounded-lg shadow">
-              <h2 className="text-xl font-semibold mb-4 text-[#426a5a]">Galería de Imágenes</h2>
+          )}
+        </div>
+        {/* Accordion: Imágenes */}
+        <div className="mb-4 border rounded-lg">
+          <button className="w-full text-left px-4 py-3 font-semibold text-[#426a5a] bg-[#f5f5f5] rounded-t-lg focus:outline-none" onClick={() => setOpenSection(openSection === 'imagenes' ? null : 'imagenes')}>
+            Imágenes
+          </button>
+          {openSection === 'imagenes' && (
+            <div className="p-4 bg-white rounded-b-lg">
               <div className="mb-6">
                 <h3 className="text-lg font-medium text-gray-700 mb-3">Subir Nueva Imagen</h3>
                 <CloudinaryUpload
-                  locationId={selectedLocation.id}
-                  onUploadSuccess={(_, message) =>
-                    setToast({ open: true, message: message || 'Imagen subida correctamente' })
-                  }
+                  locationId={selectedLocation?.id || ""}
+                  onUploadSuccess={(link) => {
+                    setPendingImages(imgs => [...imgs, { link }]);
+                  }}
                   onUploadError={msg =>
                     setToast({ open: true, message: msg || 'Error al subir la imagen' })
                   }
                 />
               </div>
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium text-gray-700">Imágenes Actuales</h3>
-                {(selectedLocation.images ?? []).map((image) => (
-                  <div key={image.id} className="relative group">
-                    <img
-                      src={image.link}
-                      alt={`Imagen de ${selectedLocation.name}`}
-                      className="w-full h-48 object-cover rounded-lg"
-                    />
-                    <button
-                      onClick={() => handleDeleteImage(image.id)}
-                      className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
-                      title="Eliminar imagen"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Botón Guardar */}
-            <div className="flex justify-end">
-              <button
-                onClick={handleSave}
-                className="px-6 py-2 bg-[#426a5a] text-white rounded-md hover:bg-[#2d4a3e]"
-              >
-                Guardar Cambios
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Formulario de creación de sede */}
-        {isCreating && (
-          <div className="space-y-6">
-            <div className="bg-white p-6 rounded-lg shadow">
-              <h2 className="text-xl font-semibold text-[#426a5a] mb-4">Crear Nueva Sede</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
-                  <input
-                    type="text"
-                    value={newLocation.name}
-                    onChange={e => setNewLocation({ ...newLocation, name: e.target.value })}
-                    className="w-full p-2 border rounded-md"
-                  />
+              {pendingImages.length > 0 && (
+                <div className="space-y-2 mb-6">
+                  <h3 className="text-md font-medium text-gray-700">Imágenes pendientes de guardar</h3>
+                  {pendingImages.map((img, i) => (
+                    <div key={i} className="flex items-center gap-4 bg-yellow-50 p-2 rounded">
+                      <img src={img.link} alt="Pendiente" className="h-20 w-32 object-cover rounded" />
+                      <button
+                        onClick={() => handleSaveImage(img.link)}
+                        className="px-4 py-2 rounded-full bg-[#426a5a] text-[#f2c57c] font-semibold hover:bg-[#2d473a] transition-colors"
+                      >
+                        Guardar imagen
+                      </button>
+                    </div>
+                  ))}
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Dirección</label>
-                  <input
-                    type="text"
-                    value={newLocation.address}
-                    onChange={e => setNewLocation({ ...newLocation, address: e.target.value })}
-                    className="w-full p-2 border rounded-md"
-                  />
+              )}
+              {selectedLocation && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium text-gray-700">Imágenes Actuales</h3>
+                  {(selectedLocation.images ?? []).map((image) => (
+                    <div key={image.id} className="relative group">
+                      <img
+                        src={image.link}
+                        alt={`Imagen de ${selectedLocation.name}`}
+                        className="w-full h-48 object-cover rounded-lg"
+                      />
+                      <button
+                        onClick={() => handleDeleteImage(image.id)}
+                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                        title="Eliminar imagen"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
-                  <input
-                    type="text"
-                    value={newLocation.phone}
-                    onChange={e => setNewLocation({ ...newLocation, phone: e.target.value })}
-                    className="w-full p-2 border rounded-md"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
-                  <textarea
-                    value={newLocation.description}
-                    onChange={e => setNewLocation({ ...newLocation, description: e.target.value })}
-                    className="w-full p-2 border rounded-md"
-                    rows={3}
-                  />
-                </div>
-              </div>
+              )}
             </div>
-            {/* Servicios */}
-            <div className="bg-white p-6 rounded-lg shadow">
-              <h2 className="text-xl font-semibold mb-4 text-[#426a5a]">Servicios</h2>
-              <div className="mb-4 flex gap-2">
-                <input
-                  type="text"
-                  value={newServiceCreate}
-                  onChange={e => setNewServiceCreate(e.target.value)}
-                  placeholder="Nuevo servicio"
-                  className="flex-1 p-2 border rounded-md"
-                  onKeyPress={e => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAddServiceCreate();
-                    }
-                  }}
-                />
-                <button
-                  onClick={handleAddServiceCreate}
-                  className="px-4 py-2 bg-[#426a5a] text-white rounded-md hover:bg-[#2d4a3e]"
-                >
-                  Agregar
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {newLocation.services.map((service, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full"
-                  >
-                    <span>{service}</span>
-                    <button
-                      onClick={() => handleRemoveServiceCreate(service)}
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-            {/* Horarios */}
-            <div className="bg-white p-6 rounded-lg shadow">
-              <h2 className="text-xl font-semibold mb-4 text-[#426a5a]">Horarios</h2>
-              <div className="overflow-x-auto">
-                <table className="min-w-full border text-center">
-                  <thead>
-                    <tr className="bg-gray-100">
-                      <th className="p-2 border">Día</th>
-                      <th className="p-2 border">Abierto</th>
-                      <th className="p-2 border">Hora Apertura</th>
-                      <th className="p-2 border">Hora Cierre</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {DAYS_OF_WEEK.map((day, i) => {
-                      const schedule = newLocation.schedules[i];
-                      return (
-                        <tr key={i}>
-                          <td className="p-2 border font-medium">{day}</td>
-                          <td className="p-2 border">
-                            <input
-                              type="checkbox"
-                              checked={schedule.isOpen}
-                              onChange={e => {
-                                const updated = [...newLocation.schedules];
-                                updated[i].isOpen = e.target.checked;
-                                setNewLocation({ ...newLocation, schedules: updated });
-                              }}
-                            />
-                          </td>
-                          <td className="p-2 border">
-                            <input
-                              type="text"
-                              value={newHourInputs[i]?.open || format(new Date(schedule.openingTime), 'HH:mm')}
-                              disabled={!schedule.isOpen}
-                              onChange={e => {
-                                setNewHourInputs({ ...newHourInputs, [i]: { ...newHourInputs[i], open: e.target.value } });
-                              }}
-                              onBlur={e => {
-                                const value = e.target.value;
-                                if (/^\d{2}:\d{2}$/.test(value)) {
-                                  const updated = [...newLocation.schedules];
-                                  const date = new Date(schedule.openingTime || new Date());
-                                  const [h, m] = value.split(':');
-                                  date.setHours(parseInt(h), parseInt(m));
-                                  updated[i].openingTime = date.toISOString();
-                                  setNewLocation({ ...newLocation, schedules: updated });
-                                }
-                              }}
-                              placeholder="HH:mm"
-                              maxLength={5}
-                              className="w-20 p-1 border rounded text-center"
-                            />
-                          </td>
-                          <td className="p-2 border">
-                            <input
-                              type="text"
-                              value={newHourInputs[i]?.close || format(new Date(schedule.closingTime), 'HH:mm')}
-                              disabled={!schedule.isOpen}
-                              onChange={e => {
-                                setNewHourInputs({ ...newHourInputs, [i]: { ...newHourInputs[i], close: e.target.value } });
-                              }}
-                              onBlur={e => {
-                                const value = e.target.value;
-                                if (/^\d{2}:\d{2}$/.test(value)) {
-                                  const updated = [...newLocation.schedules];
-                                  const date = new Date(schedule.closingTime || new Date());
-                                  const [h, m] = value.split(':');
-                                  date.setHours(parseInt(h), parseInt(m));
-                                  updated[i].closingTime = date.toISOString();
-                                  setNewLocation({ ...newLocation, schedules: updated });
-                                }
-                              }}
-                              placeholder="HH:mm"
-                              maxLength={5}
-                              className="w-20 p-1 border rounded text-center"
-                            />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            <div className="text-center text-gray-500 italic">Podrás agregar imágenes una vez creada la sede.</div>
-            <div className="flex justify-end">
-              <button
-                onClick={handleSaveNewLocation}
-                className="bg-[#426a5a] text-white font-bold px-6 py-2 rounded-lg shadow hover:bg-[#7fb685] transition-colors"
-              >
-                Guardar Sede
-              </button>
-            </div>
-          </div>
-        )}
-
-        <Toast 
-          open={toast.open} 
-          message={toast.message} 
-          onClose={() => setToast({ ...toast, open: false })} 
-        />
+          )}
+        </div>
       </div>
-    </>
+      <Toast open={toast.open} message={toast.message} onClose={() => setToast({ ...toast, open: false })} />
+      {/* Modal de confirmación para eliminar imagen */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm">
+            <h2 className="text-lg font-semibold mb-4 text-gray-800">¿Eliminar imagen?</h2>
+            <p className="mb-6 text-gray-600">¿Estás seguro que deseas eliminar esta imagen? Esta acción no se puede deshacer.</p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={cancelDeleteImage}
+                className="px-4 py-2 rounded bg-gray-200 text-gray-700 hover:bg-gray-300"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDeleteImage}
+                className="px-4 py-2 rounded bg-red-500 text-white hover:bg-red-600"
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </Fragment>
   );
 } 
