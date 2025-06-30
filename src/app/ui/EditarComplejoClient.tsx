@@ -698,22 +698,26 @@ export default function EditarComplejoClient({ locations: initialLocations }: { 
               {selectedLocation && (
                 <div className="space-y-4">
                   <h3 className="text-lg font-medium text-gray-700">Imágenes Actuales</h3>
-                  {(selectedLocation.images ?? []).map((image) => (
-                    <div key={image.id} className="relative group">
-                      <img
-                        src={image.link}
-                        alt={`Imagen de ${selectedLocation.name}`}
-                        className="w-full h-48 object-cover rounded-lg"
-                      />
-                      <button
-                        onClick={() => handleDeleteImage(image.id)}
-                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
-                        title="Eliminar imagen"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
+                  {(selectedLocation.images && selectedLocation.images.length > 0) ? (
+                    selectedLocation.images.map((image) => (
+                      <div key={image.id} className="relative group">
+                        <img
+                          src={image.link}
+                          alt={`Imagen de ${selectedLocation.name}`}
+                          className="w-full h-48 object-cover rounded-lg"
+                        />
+                        <button
+                          onClick={() => handleDeleteImage(image.id)}
+                          className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                          title="Eliminar imagen"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-gray-500 italic py-8 text-center">No hay imágenes disponibles</div>
+                  )}
                 </div>
               )}
             </div>

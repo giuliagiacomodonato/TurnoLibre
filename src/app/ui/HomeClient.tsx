@@ -493,7 +493,7 @@ export default function HomeClient({ sports: initialSports, locations: initialLo
                 phone={location.phone}
                 sports={sports.map(s => s.name)}
                 services={location.services ?? []}
-                images={Array.isArray(location.images) && location.images.length > 0 ? location.images.map(i => i.link) : ['/canchas1.jpg', '/canchas2.jpg', '/canchas3.jpg']}
+                images={Array.isArray(location.images) && location.images.length > 0 ? location.images.map(i => i.link) : []}
                 hours={(location.schedules ?? []).map(schedule => {
                   const localOpening = new Date(schedule.openingTime);
                   const localClosing = new Date(schedule.closingTime);
