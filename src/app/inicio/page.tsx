@@ -1,5 +1,7 @@
 import HomeClient from "@/app/ui/HomeClient";
 import { PushSubscribeButton } from "../ui/PushSubscribeButton";
+import { getServerSession } from "next-auth";
+import { authOptions } from "../api/auth/authOptions";
 
 export default async function HomePage() {
   const [sportsRes, locationsRes, facilitiesRes] = await Promise.all([
@@ -13,11 +15,14 @@ export default async function HomePage() {
     facilitiesRes.json()
   ]);
 
+  const session = await getServerSession(authOptions);
+  const userId = session?.user?.id;
+
   return (
     <>
       <HomeClient sports={sports} locations={locations} facilities={facilities} />
       <div className="flex justify-center mt-8">
-        <PushSubscribeButton />
+        <PushSubscribeButton userId={userId} />
       </div>
     </>
   );

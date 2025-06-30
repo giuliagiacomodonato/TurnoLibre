@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { useSession, signIn } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { AdminLoginModal } from "../ui/LoginModal";
-import { PushSubscribeButton } from "../ui/PushSubscribeButton";
 
 export default function AdminPage() {
   const router = useRouter();
@@ -109,15 +108,12 @@ export default function AdminPage() {
           <h2 className="text-xl font-bold text-[#426a5a] mb-2">FAQ</h2>
           <p className="text-gray-600">Preguntas frecuentes sobre la administración</p>
         </Link>
-      </div>
 
-      <div className="mt-4">
-        <Link href="/admin/enviar-notificacion" className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition-colors font-semibold">
-          Enviar Notificación
+        <Link href="/admin/enviar-notificacion" className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow">
+          <h2 className="text-xl font-bold text-[#426a5a] mb-2">Enviar Notificación</h2>
+          <p className="text-gray-600">Envía una notificación push a los usuarios suscritos</p>
         </Link>
       </div>
-
-      <PushSubscribeButton />
     </div>
   );
 } 

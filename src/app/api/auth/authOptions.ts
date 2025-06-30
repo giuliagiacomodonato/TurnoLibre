@@ -58,9 +58,16 @@ export const authOptions = {
         });
         if (dbUser) {
           (session.user as any).role = dbUser.role;
+          (session.user as any).id = dbUser.id;
         }
       }
       return session;
+    },
+    async jwt({ token, user }: { token: any; user?: any }) {
+      if (user && user.id) {
+        token.id = user.id;
+      }
+      return token;
     },
   },
 }; 

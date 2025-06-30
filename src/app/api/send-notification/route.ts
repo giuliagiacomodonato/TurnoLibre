@@ -15,7 +15,13 @@ export async function POST(req: Request) {
   const subscriptions = await res.json();
 
   for (const sub of subscriptions) {
-    await webpush.sendNotification(sub, payload);
+    await webpush.sendNotification({
+      endpoint: sub.endpoint,
+      keys: {
+        auth: sub.keysAuth,
+        p256dh: sub.keysP256dh,
+      }
+    }, payload);
   }
   return new Response(JSON.stringify({ success: true }), { status: 200 });
 }

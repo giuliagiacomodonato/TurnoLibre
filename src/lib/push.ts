@@ -13,7 +13,7 @@ function urlBase64ToUint8Array(base64String: string) {
   return outputArray;
 }
 
-export async function subscribeUser() {
+export async function subscribeUser(userId?: string) {
   console.log("Intentando suscribirse a notificaciones...");
   if ('serviceWorker' in navigator && 'PushManager' in window) {
     const registration = await navigator.serviceWorker.ready;
@@ -24,7 +24,7 @@ export async function subscribeUser() {
     console.log("Enviando suscripción a backend:", subscription);
     await fetch('/api/subscribe', {
       method: 'POST',
-      body: JSON.stringify(subscription),
+      body: JSON.stringify({ subscription, userId }),
       headers: { 'Content-Type': 'application/json' },
     });
     return subscription;

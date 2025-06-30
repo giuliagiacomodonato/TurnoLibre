@@ -18,6 +18,7 @@ model User {
   password      String?
   role          Role      @default(USER)
   reservations  Reservation[]
+  pushSubscriptions PushSubscription[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -27,6 +28,7 @@ model Sport {
   name          String
   description   String?
   facilities    Facility[]
+  image         String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -129,6 +131,27 @@ model Image {
   location      Location  @relation(fields: [locationId], references: [id])
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+}
+
+model PushSubscription {
+  id            String   @id @default(uuid())
+  endpoint      String   @unique
+  keysAuth      String
+  keysP256dh    String
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  notifications Notification[]
+}
+
+model Notification {
+  id            String   @id @default(uuid())
+  title         String
+  body          String
+  sentAt        DateTime @default(now())
+  subscription  PushSubscription? @relation(fields: [subscriptionId], references: [id])
+  subscriptionId String?
 }
 
 enum Role {
