@@ -30,10 +30,23 @@ export async function POST(req: Request) {
   return NextResponse.json({ success: true });
 }
 
-export async function GET() {
-  // Devuelve todas las suscripciones (solo para pruebas)
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const userId = searchParams.get('userId');
+  if (userId) {
+    const subs = await prisma.pushSubscription.findMany({ where: { userId } });
+    return new Response(JSON.stringify(subs), { status: 200 });
+  }
   const subs = await prisma.pushSubscription.findMany();
   return new Response(JSON.stringify(subs), { status: 200 });
+}
+
+export async function DELETE(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const userId = searchParams.get('userId');
+  if (!userId) return new Response(JSON.stringify({ error: 'userId requerido' }), { status: 400 });
+  await prisma.pushSubscription.deleteMany({ where: { userId } });
+  return new Response(JSON.stringify({ success: true }), { status: 200 });
 }
 
 webpush.setVapidDetails(

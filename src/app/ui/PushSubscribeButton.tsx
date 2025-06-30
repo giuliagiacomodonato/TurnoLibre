@@ -2,7 +2,7 @@
 import { subscribeUser } from "@/lib/push";
 import { useState } from "react";
 
-export function PushSubscribeButton({ userId }: { userId?: string }) {
+export function PushSubscribeButton({ userId, onSuccess, buttonClass }: { userId?: string, onSuccess?: () => void, buttonClass?: string }) {
   const [subscribed, setSubscribed] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -11,6 +11,7 @@ export function PushSubscribeButton({ userId }: { userId?: string }) {
     try {
       await subscribeUser(userId);
       setSubscribed(true);
+      if (onSuccess) onSuccess();
     } catch (err) {
       setError("Error al suscribirse a notificaciones");
     }
@@ -21,7 +22,7 @@ export function PushSubscribeButton({ userId }: { userId?: string }) {
       <button
         onClick={handleSubscribe}
         disabled={subscribed || !userId}
-        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
+        className={buttonClass || "px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"}
       >
         {subscribed ? "¡Suscrito!" : "Suscribirse a notificaciones push"}
       </button>

@@ -21,9 +21,7 @@ export default async function HomePage() {
   return (
     <>
       <HomeClient sports={sports} locations={locations} facilities={facilities} />
-      <div className="flex justify-center mt-8">
-        <PushSubscribeButton userId={userId} />
-      </div>
+      
     </>
   );
 }
