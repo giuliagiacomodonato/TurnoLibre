@@ -10,6 +10,7 @@ export type CartItem = {
   price: number;
   image?: string;
   facilityId: string;
+  sportName: string;
 };
 
 export interface CartContextType {

@@ -71,71 +71,75 @@ export default function EditarDisponibilidadClient({ facilities: initialFaciliti
       setIsLoading(false);
       return;
     }
-    
     const [year, month, day] = selectedDate.split('-').map(Number);
-    const base = new Date(year, month - 1, day, 12, 0, 0, 0);
-    
-    try {
-      for (let i = 0; i < 7; i++) {
-        const date = new Date(base);
-        date.setDate(base.getDate() + i);
-        const dateString = getLocalDateString(date);
-        newAvailability[dateString] = {};
-        const dayOfWeek = date.getDay();
-        const avail = (facility.availability || []).find((a) => a.dayOfWeek === dayOfWeek);
-        if (!avail) {
-          newAvailability[dateString][selectedFacility] = [];
-          continue;
-        }
-        
-        const opening = utcToLocal(avail.openingTime);
-        const closing = utcToLocal(avail.closingTime);
-        const slotDuration = avail.slotDuration;
-        const timeSlots: string[] = [];
-        let current = new Date(opening.getTime());
-        while (current < closing) {
-          timeSlots.push(current.toTimeString().slice(0,5));
-          current = new Date(current.getTime() + slotDuration * 60000);
-        }
-        try {
-          const res = await fetch(`/api/availability/blocks?date=${dateString}&facilityId=${selectedFacility}`);
-          let blocks = await res.json();
-          if (!Array.isArray(blocks)) blocks = [];
-          newAvailability[dateString][selectedFacility] = timeSlots.map(slot => {
-            const slotMinutes = getMinutesFromTimeString(slot);
-            const blockedReservation = blocks.find((block: any) => {
-              if (block.status !== "BLOCKED" && block.status !== "CONFIRMED" && block.status !== "PENDING") return false;
-              const blockStart = new Date(block.startTime);
-              const blockHour = blockStart.getHours();
-              const blockMinute = blockStart.getMinutes();
-              const blockMinutes = blockHour * 60 + blockMinute;
-              return blockMinutes === slotMinutes;
-            });
-            const isReservation = blockedReservation && (blockedReservation.status === "CONFIRMED" || blockedReservation.status === "PENDING");
-            const isConfirmedReservation = blockedReservation && blockedReservation.status === "CONFIRMED";
-            return { 
-              time: slot,
-              available: !blockedReservation,
-              reason: blockedReservation?.reason || (isReservation ? "Reservado" : undefined),
-              isReservation: isReservation,
-              isConfirmedReservation: isConfirmedReservation,
-              reservationId: blockedReservation?.id,
-              user: blockedReservation?.user
-            };
-          });
-        } catch (error) {
-          newAvailability[dateString][selectedFacility] = timeSlots.map(time => ({
-            time,
-            available: true
-          }));
-        }
-      }
+    const date = new Date(year, month - 1, day, 12, 0, 0, 0);
+    const dateString = getLocalDateString(date);
+    newAvailability[dateString] = {};
+    const dayOfWeek = date.getDay();
+    const avail = (facility.availability || []).find((a) => a.dayOfWeek === dayOfWeek);
+    if (!avail) {
+      newAvailability[dateString][selectedFacility] = [];
       setAvailability(newAvailability);
-    } catch (error) {
-      console.error('Error updating availability:', error);
-    } finally {
       setIsLoading(false);
+      return;
     }
+    const opening = utcToLocal(avail.openingTime);
+    const closing = utcToLocal(avail.closingTime);
+    const slotDuration = avail.slotDuration;
+    const timeSlots: string[] = [];
+    let current = new Date(opening.getTime());
+    while (current < closing) {
+      timeSlots.push(current.toTimeString().slice(0,5));
+      current = new Date(current.getTime() + slotDuration * 60000);
+    }
+    // --- CACHE: Revisar localStorage ---
+    const cacheKey = `availability_${selectedFacility}_${dateString}`;
+    let blocks = null;
+    const cached = typeof window !== 'undefined' ? localStorage.getItem(cacheKey) : null;
+    if (cached) {
+      try {
+        const { data, timestamp } = JSON.parse(cached);
+        if (Date.now() - timestamp < 2 * 60 * 1000) {
+          blocks = data;
+        }
+      } catch {}
+    }
+    if (!blocks) {
+      try {
+        const res = await fetch(`/api/availability/blocks?date=${dateString}&facilityId=${selectedFacility}`);
+        blocks = await res.json();
+        if (!Array.isArray(blocks)) blocks = [];
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(cacheKey, JSON.stringify({ data: blocks, timestamp: Date.now() }));
+        }
+      } catch {
+        blocks = [];
+      }
+    }
+    newAvailability[dateString][selectedFacility] = timeSlots.map(slot => {
+      const slotMinutes = getMinutesFromTimeString(slot);
+      const blockedReservation = blocks.find((block: any) => {
+        if (block.status !== "BLOCKED" && block.status !== "CONFIRMED" && block.status !== "PENDING") return false;
+        const blockStart = new Date(block.startTime);
+        const blockHour = blockStart.getHours();
+        const blockMinute = blockStart.getMinutes();
+        const blockMinutes = blockHour * 60 + blockMinute;
+        return blockMinutes === slotMinutes;
+      });
+      const isReservation = blockedReservation && (blockedReservation.status === "CONFIRMED" || blockedReservation.status === "PENDING");
+      const isConfirmedReservation = blockedReservation && blockedReservation.status === "CONFIRMED";
+      return {
+        time: slot,
+        available: !blockedReservation,
+        reason: blockedReservation?.reason || (isReservation ? "Reservado" : undefined),
+        isReservation: isReservation,
+        isConfirmedReservation: isConfirmedReservation,
+        reservationId: blockedReservation?.id,
+        user: blockedReservation?.user
+      };
+    });
+    setAvailability(newAvailability);
+    setIsLoading(false);
   };
 
   const handlePreviousDay = () => {

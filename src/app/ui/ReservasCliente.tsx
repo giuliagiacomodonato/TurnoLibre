@@ -278,7 +278,7 @@ export default function ReservasCliente({ reservas }: { reservas: Reservation[] 
           <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full mx-4">
             <h3 className="text-lg font-bold text-red-600 mb-4 text-center">Cancelar Reserva</h3>
             <p className="mb-4 text-gray-700 text-center">
-              ¿Estás seguro de que quieres cancelar tu reserva?
+              ¿Estás seguro de que quieres cancelar tu reserva? Al hacerlo, el horario quedará disponible nuevamente para otros usuarios y no se te devolverá el dinero.
             </p>
             <p className="mb-4 text-sm text-gray-600 text-center">
               <strong>{selectedReservation?.facility.name}</strong><br />

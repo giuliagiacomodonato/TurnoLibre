@@ -22,7 +22,12 @@ export function Cart({ items, onRemove, onCheckout, loading }: {
           ) : (
             items.map(item => (
               <div key={item.id} className="flex bg-white/90 rounded-2xl shadow-xl p-4 items-center gap-4">
-                {item.image && (
+                {/* Imagen del deporte */}
+                {item.sportName && (
+                  <img src={`/${item.sportName}.svg`} alt={item.sportName} className="w-16 h-16 object-contain rounded-lg border border-[#7fb685]/30 bg-white" onError={e => { e.currentTarget.style.display = 'none'; }} />
+                )}
+                {/* Imagen antigua del item (por compatibilidad) */}
+                {item.image && !item.sportName && (
                   <img src={item.image} alt={item.name} className="w-24 h-24 object-cover rounded-lg border border-[#7fb685]/30" />
                 )}
                 <div className="flex-1">

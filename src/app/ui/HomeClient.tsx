@@ -62,38 +62,19 @@ export default function HomeClient({ sports: initialSports, locations: initialLo
     return new Date(utcDate.getUTCFullYear(), utcDate.getUTCMonth(), utcDate.getUTCDate(), utcDate.getUTCHours(), utcDate.getUTCMinutes(), utcDate.getUTCSeconds());
   }
 
-  // Function to fetch latest sports data and generate availability
+  // Function to fetch latest sports data and generate availability (OPTIMIZADO)
   const updateAvailability = async () => {
     setIsLoadingAvailability(true);
     try {
-      // Agrupar facilities por deporte
-      const groupedFacilities: { [sportId: string]: Facility[] } = {};
-      initialFacilities.forEach((f: Facility) => {
-        if (!f.sportId) return;
-        if (!groupedFacilities[f.sportId]) groupedFacilities[f.sportId] = [];
-        groupedFacilities[f.sportId].push(f);
-      });
-      // Actualizar sports con facilities
-      setSports(prevSports => prevSports.map(s => ({
-        ...s,
-        facilities: groupedFacilities[s.id] || []
-      })));
+      // Solo facilities del deporte seleccionado
+      const facilitiesForSport = initialFacilities.filter(f => f.sportId === selectedSport);
       const newAvailability: Availability = {};
-      // Para cada día de la semana
-      for (let i = 0; i < 7; i++) {
-        const base = selectedDate
-          ? (() => {
-              const [year, month, day] = selectedDate.split('-').map(Number);
-              return new Date(year, month - 1, day, 12, 0, 0, 0);
-            })()
-          : new Date();
-        const date = new Date(base);
-        date.setDate(base.getDate() + i);
-        const dateString = getLocalDateString(date);
+      // Solo el día seleccionado
+      const daysToFetch = [selectedDate];
+      for (const dateString of daysToFetch) {
         newAvailability[dateString] = {};
-        const dayOfWeek = date.getDay();
-        // Para cada facility - mostrar todas las canchas sin filtrar por sede
-        for (const facility of initialFacilities) {
+        const dayOfWeek = new Date(dateString).getDay();
+        for (const facility of facilitiesForSport) {
           // Buscar availability para ese día
           const avail = (facility.availability || []).find((a: any) => a.dayOfWeek === dayOfWeek);
           if (!avail) continue;
@@ -108,27 +89,41 @@ export default function HomeClient({ sports: initialSports, locations: initialLo
             slots.push({ time, available: true, slotDuration });
             current = new Date(current.getTime() + slotDuration * 60000);
           }
-          // Consultar slots bloqueados desde la API
-          try {
-            const res = await fetch(`/api/availability/blocks?date=${dateString}&facilityId=${facility.id}`);
-            let blocks = await res.json();
-            if (!Array.isArray(blocks)) blocks = [];
-            newAvailability[dateString][facility.id] = slots.map(slot => {
-              const slotMinutes = getMinutesFromTimeString(slot.time);
-              const blockedReservation = blocks.find((block: any) => {
-                if (block.status !== "BLOCKED" && block.status !== "CONFIRMED" && block.status !== "PENDING") return false;
-                const blockStart = new Date(block.startTime);
-                const blockHour = blockStart.getHours();
-                const blockMinute = blockStart.getMinutes();
-                const blockMinutes = blockHour * 60 + blockMinute;
-                return blockMinutes === slotMinutes;
-              });
-              return { ...slot, available: !blockedReservation };
-            });
-          } catch (error) {
-            // Si hay error, dejar todos los slots como disponibles
-            newAvailability[dateString][facility.id] = slots;
+          // --- CACHE: Revisar localStorage ---
+          const cacheKey = `availability_${facility.id}_${dateString}`;
+          let blocks = null;
+          const cached = typeof window !== 'undefined' ? localStorage.getItem(cacheKey) : null;
+          if (cached) {
+            try {
+              const { data, timestamp } = JSON.parse(cached);
+              // Considera válido el cache por 2 minutos
+              if (Date.now() - timestamp < 2 * 60 * 1000) {
+                blocks = data;
+              }
+            } catch {}
           }
+          if (!blocks) {
+            // Si no hay cache, consulta la API
+            const res = await fetch(`/api/availability/blocks?date=${dateString}&facilityId=${facility.id}`);
+            blocks = await res.json();
+            if (!Array.isArray(blocks)) blocks = [];
+            // Guarda en cache
+            if (typeof window !== 'undefined') {
+              localStorage.setItem(cacheKey, JSON.stringify({ data: blocks, timestamp: Date.now() }));
+            }
+          }
+          newAvailability[dateString][facility.id] = slots.map(slot => {
+            const slotMinutes = getMinutesFromTimeString(slot.time);
+            const blockedReservation = blocks.find((block: any) => {
+              if (block.status !== "BLOCKED" && block.status !== "CONFIRMED" && block.status !== "PENDING") return false;
+              const blockStart = new Date(block.startTime);
+              const blockHour = blockStart.getHours();
+              const blockMinute = blockStart.getMinutes();
+              const blockMinutes = blockHour * 60 + blockMinute;
+              return blockMinutes === slotMinutes;
+            });
+            return { ...slot, available: !blockedReservation };
+          });
         }
       }
       setAvailability(newAvailability);
@@ -231,8 +226,8 @@ export default function HomeClient({ sports: initialSports, locations: initialLo
         time: selectedSlot.time,
         court: selectedFacilityDetails.name,
         price: selectedFacilityDetails.price ?? 0,
-        image: '/canchas1.jpg',
         facilityId: selectedFacilityDetails.id,
+        sportName: (sports.find(s => s.id === selectedSport)?.name.split(' ')[0] || ''),
       });
       handleClosePopup();
       setToastMessage('Turno agregado al carrito exitosamente');
@@ -442,21 +437,33 @@ export default function HomeClient({ sports: initialSports, locations: initialLo
                               <div>{facility.name}</div>
                               <div className="text-xs text-gray-500">{facility.location?.name}</div>
                             </div>
-                            {availability[selectedDate]?.[facility.id]?.map(slot => (
-                              <div
-                                key={slot.time}
-                                className={`h-10 w-12 md:h-12 md:w-16 rounded-lg mx-1 my-1 flex items-center justify-center text-xs md:text-sm font-semibold transition-colors \
-                                  ${slot.available 
-                                    ? 'bg-[#7fb685] hover:bg-[#426a5a] cursor-pointer text-[#426a5a] hover:text-white' 
-                                    : 'bg-gray-300 cursor-not-allowed text-gray-400'}
-                                `}
-                                style={{ minWidth: '3rem', minHeight: '2.5rem' }}
-                                title={`${slot.time} - ${slot.available ? 'Disponible' : 'No disponible'}`}
-                                onClick={() => handleSlotClick(facility.id, slot.time, slot.available)}
-                              >
-                                {/* Sin hora dentro del slot */}
-                              </div>
-                            ))}
+                            {availability[selectedDate]?.[facility.id]?.map(slot => {
+                              // Calcular si el slot es pasado
+                              let isPast = false;
+                              if (selectedDate === getLocalDateString(new Date())) {
+                                const now = new Date();
+                                const [slotHour, slotMinute] = slot.time.split(':').map(Number);
+                                if (now.getHours() > slotHour || (now.getHours() === slotHour && now.getMinutes() > slotMinute)) {
+                                  isPast = true;
+                                }
+                              }
+                              const notAvailable = !slot.available || isPast;
+                              return (
+                                <div
+                                  key={slot.time}
+                                  className={`h-10 w-12 md:h-12 md:w-16 rounded-lg mx-1 my-1 flex items-center justify-center text-xs md:text-sm font-semibold transition-colors \
+                                    ${notAvailable 
+                                      ? 'bg-gray-300 cursor-not-allowed text-gray-400' 
+                                      : 'bg-[#7fb685] hover:bg-[#426a5a] cursor-pointer text-[#426a5a] hover:text-white'}
+                                  `}
+                                  style={{ minWidth: '3rem', minHeight: '2.5rem' }}
+                                  title={`${slot.time} - ${notAvailable ? 'No disponible' : 'Disponible'}`}
+                                  onClick={() => handleSlotClick(facility.id, slot.time, slot.available && !isPast)}
+                                >
+                                  {/* Sin hora dentro del slot */}
+                                </div>
+                              );
+                            })}
                           </div>
                         ))}
                         {facilities.length === 0 && (
@@ -506,10 +513,20 @@ export default function HomeClient({ sports: initialSports, locations: initialLo
                   };
                 })}
               />
+              <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-6 mt-4 flex justify-center">
+                <a href="/FAQ" className="text-[#426a5a] underline hover:text-[#7fb685] text-lg font-semibold">
+                  Preguntas frecuentes 
+                </a>
+              </div>
             </div>
           </div>
         </div>
       </main>
+      <div className="w-full flex justify-center pb-8">
+        <a href="/FAQ" className="text-[#426a5a] underline hover:text-[#7fb685] text-lg font-semibold">
+          Preguntas frecuentes 
+        </a>
+      </div>
       {/* Footer */}
       <footer className="bg-[#426a5a]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">

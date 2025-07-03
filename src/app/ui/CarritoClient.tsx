@@ -5,12 +5,14 @@ import { Header } from './Header';
 import { useCart } from './CartContext';
 import { LoginModal } from './LoginModal';
 import { useSession } from "next-auth/react";
+import { Toast } from './Toast';
 
 export default function CarritoClient() {
   const { data: session } = useSession();
   const { items, removeItem, isHydrated } = useCart();
   const [showLogin, setShowLogin] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState<{ open: boolean; message: string; type?: 'success' | 'error' }>({ open: false, message: '' });
 
   const handleCheckout = async () => {
     if (!session) {
@@ -37,10 +39,10 @@ export default function CarritoClient() {
       if (data.init_point) {
         window.location.href = data.init_point;
       } else {
-        alert('Error al iniciar el pago.');
+        setToast({ open: true, message: 'Error al iniciar el pago.', type: 'error' });
       }
     } catch (e) {
-      alert('Error al conectar con MercadoPago.');
+      setToast({ open: true, message: 'Error al conectar con MercadoPago.', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -58,6 +60,7 @@ export default function CarritoClient() {
           </>
         )}
         <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} callbackUrl="/inicio/carrito" />
+        <Toast open={toast.open} message={toast.message} type={toast.type} onClose={() => setToast({ ...toast, open: false })} />
       </main>
     </div>
   );

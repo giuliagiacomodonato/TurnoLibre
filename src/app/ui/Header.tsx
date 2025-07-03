@@ -7,6 +7,7 @@ import { SessionProvider } from "next-auth/react";
 import { CartProvider } from './CartContext';
 import { PushSubscribeButton } from './PushSubscribeButton';
 import { Toast } from './Toast';
+import { ShoppingCartIcon, CalendarDaysIcon } from '@heroicons/react/24/outline';
 
 let BellIcon: any = (props: any) => (
   <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
@@ -89,14 +90,8 @@ export function Header() {
             <Link href="/inicio" className="text-[#f2c57c] hover:text-[#ddae7e] transition-colors">
               Ver Disponibles
             </Link>
-            <Link href="/reservas" className="text-[#f2c57c] hover:text-[#ddae7e] transition-colors">
-              Mis Reservas
-            </Link>
-            <Link href="/carrito" className="text-[#f2c57c] hover:text-[#ddae7e] transition-colors">
-              Carrito
-            </Link>
-            <Link href="/FAQ" className="text-[#f2c57c] hover:text-[#ddae7e] transition-colors">
-              FAQ
+            <Link href="/reservas" className="text-[#f2c57c] hover:text-[#ddae7e] transition-colors flex items-center" title="Mis Reservas">
+              <CalendarDaysIcon className="h-6 w-6" />
             </Link>
             <div className="relative">
               <button onClick={() => setNotifOpen(!notifOpen)} className="text-[#f2c57c] hover:text-[#ddae7e] transition-colors flex items-center" title="Notificaciones">
@@ -146,6 +141,9 @@ export function Header() {
                 </div>
               )}
             </div>
+            <Link href="/carrito" className="text-[#f2c57c] hover:text-[#ddae7e] transition-colors flex items-center ml-2" title="Carrito">
+              <ShoppingCartIcon className="h-6 w-6" />
+            </Link>
             {session ? (
               <div className="flex items-center space-x-2">
                 {session.user?.image && (
@@ -205,9 +203,6 @@ export function Header() {
                 </Link>
                 <Link href="/carrito" className="text-[#426a5a] text-lg font-semibold hover:text-[#7fb685] transition-colors" onClick={() => setMenuOpen(false)}>
                   Carrito
-                </Link>
-                <Link href="/FAQ" className="text-[#426a5a] text-lg font-semibold hover:text-[#7fb685] transition-colors" onClick={() => setMenuOpen(false)}>
-                  FAQ
                 </Link>
                 <button
                   onClick={() => setNotifOpen(!notifOpen)}
