@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
       where,
       include: {
         sport: true,
-        location: true,
+        location: { include: { schedules: true } },
         schedules: true,
         availability: true,
       },

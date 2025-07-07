@@ -218,6 +218,11 @@ export default function EditarComplejoClient({ locations: initialLocations }: { 
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          name: selectedLocation.name,
+          address: selectedLocation.address,
+          phone: selectedLocation.phone,
+          description: selectedLocation.description,
+          services: selectedLocation.services,
           schedules: editingSchedules.map(schedule => ({
             dayOfWeek: schedule.dayOfWeek,
             isOpen: schedule.isOpen,

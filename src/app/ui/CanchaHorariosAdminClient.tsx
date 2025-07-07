@@ -2,11 +2,25 @@
 import { useState, useEffect } from "react";
 import { Toast } from "../ui/Toast";
 import { AdminHeader } from "../ui/Header";
-import type { CanchaHorariosAdminClientProps } from '@/lib/types';
+import type { CanchaHorariosAdminClientProps, Facility, Location, LocationSchedule } from '@/lib/types';
 import { DAYS_OF_WEEK, DIAS_ORDEN } from '@/lib/utils';
 
-function ReglasHorarios({ reglas, setReglas }: { reglas: any[]; setReglas: (r: any[]) => void }) {
+function ReglasHorarios({ reglas, setReglas, location }: { reglas: any[]; setReglas: (r: any[]) => void, location: any }) {
   const [nueva, setNueva] = useState({ dia: "Todos", apertura: "08:00", cierre: "23:00", duracion: "60" });
+
+  // Obtener horarios permitidos según el día y la sede
+  const getScheduleForDay = (dia: string) => {
+    if (!location || !location.schedules) return null;
+    if (dia === "Todos") return null;
+    const dias = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+    const idx = dias.indexOf(dia);
+    return location.schedules.find((s: any) => s.dayOfWeek === idx);
+  };
+
+  const schedule = getScheduleForDay(nueva.dia);
+  const isClosed = schedule && !schedule.isOpen;
+  const minApertura = schedule ? schedule.openingTime.slice(0,5) : "08:00";
+  const maxCierre = schedule ? schedule.closingTime.slice(0,5) : "23:00";
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setNueva({ ...nueva, [e.target.name]: e.target.value });
@@ -83,21 +97,24 @@ function ReglasHorarios({ reglas, setReglas }: { reglas: any[]; setReglas: (r: a
         </div>
         <div>
           <label className="block text-[#426a5a] font-semibold mb-1">Apertura</label>
-          <input type="time" name="apertura" value={nueva.apertura} onChange={handleChange} className="rounded-lg border-[#7fb685] px-3 py-2" />
+          <input type="time" name="apertura" value={nueva.apertura} onChange={handleChange} className="rounded-lg border-[#7fb685] px-3 py-2" min={minApertura} max={maxCierre} disabled={isClosed} />
         </div>
         <div>
           <label className="block text-[#426a5a] font-semibold mb-1">Cierre</label>
-          <input type="time" name="cierre" value={nueva.cierre} onChange={handleChange} className="rounded-lg border-[#7fb685] px-3 py-2" />
+          <input type="time" name="cierre" value={nueva.cierre} onChange={handleChange} className="rounded-lg border-[#7fb685] px-3 py-2" min={minApertura} max={maxCierre} disabled={isClosed} />
         </div>
         <div>
           <label className="block text-[#426a5a] font-semibold mb-1">Duración</label>
-          <select name="duracion" value={nueva.duracion} onChange={handleChange} className="rounded-lg border-[#7fb685] px-3 py-2 w-24">
+          <select name="duracion" value={nueva.duracion} onChange={handleChange} className="rounded-lg border-[#7fb685] px-3 py-2 w-24" disabled={isClosed}>
             <option value="60">60 min</option>
             <option value="90">90 min</option>
           </select>
         </div>
-        <button onClick={agregarRegla} className="bg-[#426a5a] text-white font-bold px-6 py-2 rounded-lg shadow hover:bg-[#7fb685] transition-colors">Agregar regla</button>
+        <button onClick={agregarRegla} className="bg-[#426a5a] text-white font-bold px-6 py-2 rounded-lg shadow hover:bg-[#7fb685] transition-colors" disabled={isClosed}>Agregar regla</button>
       </div>
+      {isClosed && (
+        <div className="mt-2 text-red-600 font-semibold">El complejo está cerrado ese día.</div>
+      )}
     </div>
   );
 }
@@ -174,6 +191,28 @@ export default function CanchaHorariosAdminClient({ sedes: initialSedes = [], ca
     return sport ? sport.id : null;
   };
 
+  // Validar que las reglas estén dentro del horario de la sede
+  interface ReglaHorario {
+    dia: string;
+    apertura: string;
+    cierre: string;
+    duracion: string;
+  }
+  const validarReglasConHorarioDeSede = (reglas: ReglaHorario[], location: Location) => {
+    if (!location || !location.schedules) return true;
+    for (const regla of reglas) {
+      if (regla.dia === "Todos") continue; // Puedes ajustar la lógica para "Todos" si lo deseas
+      const dias = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+      const idx = dias.indexOf(regla.dia);
+      const schedule = location.schedules.find((s: LocationSchedule) => s.dayOfWeek === idx);
+      if (!schedule || !schedule.isOpen) return false;
+      if (regla.apertura < schedule.openingTime.slice(0,5) || regla.cierre > schedule.closingTime.slice(0,5)) {
+        return false;
+      }
+    }
+    return true;
+  };
+
   const agregarCancha = async () => {
     const precio = Number(nuevo.precio);
     if (!nuevo.nombre || !nuevo.deporte || !nuevo.precio || precio <= 0 || !selectedSede) {
@@ -223,6 +262,11 @@ export default function CanchaHorariosAdminClient({ sedes: initialSedes = [], ca
 
   const guardarCancha = async () => {
     if (!cancha) return;
+    // Validación de reglas con horario de sede
+    if (!validarReglasConHorarioDeSede(cancha.reglas, cancha.location)) {
+      setToast({ open: true, message: "Hay reglas fuera del horario permitido por el complejo." });
+      return;
+    }
     const sportId = getSportIdByName(sports, cancha.deporte);
     if (!sportId) {
       setToast({ open: true, message: "Deporte no válido" });
@@ -357,7 +401,7 @@ export default function CanchaHorariosAdminClient({ sedes: initialSedes = [], ca
                     />
                   </div>
                 </div>
-                <ReglasHorarios reglas={cancha.reglas || []} setReglas={setReglas} />
+                <ReglasHorarios reglas={cancha.reglas || []} setReglas={setReglas} location={cancha.location} />
                 <div className="flex justify-end">
                   <button onClick={guardarCancha} className="bg-[#426a5a] text-white font-bold px-6 py-2 rounded-lg shadow hover:bg-[#7fb685] transition-colors">Guardar cambios</button>
                 </div>
