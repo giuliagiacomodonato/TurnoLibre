@@ -34,6 +34,7 @@ export type FacilityAvailability = {
   openingTime: string;
   closingTime: string;
   slotDuration: number;
+  createdAt?: string;
 };
 
 export type Facility = {
@@ -92,6 +93,7 @@ export type Availability = {
     [facilityId: string]: {
       time: string;
       available: boolean;
+      slotDuration?: number;
       reason?: string;
       isReservation?: boolean;
       isConfirmedReservation?: boolean;

@@ -76,7 +76,22 @@ export default function EditarDisponibilidadClient({ facilities: initialFaciliti
     const dateString = getLocalDateString(date);
     newAvailability[dateString] = {};
     const dayOfWeek = date.getDay();
-    const avail = (facility.availability || []).find((a) => a.dayOfWeek === dayOfWeek);
+    const availabilities = (facility.availability || [])
+      .filter(a => {
+        if (!a.createdAt) return true;
+        const created = new Date(a.createdAt);
+        return created <= new Date(date.getTime() - 7 * 24 * 60 * 60 * 1000);
+      })
+      .filter(a => a.dayOfWeek === dayOfWeek);
+    // Usar la regla más reciente que cumpla la condición
+    let avail = null;
+    if (availabilities.length > 0) {
+      avail = availabilities.reduce((latest, curr) => {
+        const latestDate = latest.createdAt ? new Date(latest.createdAt) : new Date(0);
+        const currDate = curr.createdAt ? new Date(curr.createdAt) : new Date(0);
+        return currDate > latestDate ? curr : latest;
+      }, availabilities[0]);
+    }
     if (!avail) {
       newAvailability[dateString][selectedFacility] = [];
       setAvailability(newAvailability);
@@ -158,7 +173,7 @@ export default function EditarDisponibilidadClient({ facilities: initialFaciliti
     currentDate.setDate(currentDate.getDate() + 1);
     const nextDateString = getLocalDateString(currentDate);
     const maxDate = new Date();
-    maxDate.setDate(maxDate.getDate() + 7);
+    maxDate.setDate(maxDate.getDate() + 30);
     if (nextDateString <= getLocalDateString(maxDate)) {
       setSelectedDate(nextDateString);
     }
@@ -324,26 +339,12 @@ export default function EditarDisponibilidadClient({ facilities: initialFaciliti
                 <div className="w-full min-w-[800px]">
                   <div className="grid grid-cols-[200px_repeat(36,minmax(4rem,1fr))] gap-1 text-center mb-4">
                     <div className="col-span-1 font-bold text-[#426a5a]">Horario</div>
+                    {/* Tomar los headers de los slots reales del availability */}
                     {(() => {
-                      const facility = facilities.find(f => f.id === selectedFacility);
-                      if (!facility || !facility.availability) return null;
-                      const [year, month, day] = selectedDate.split('-').map(Number);
-                      const dateObj = new Date(year, month - 1, day);
-                      const dayOfWeek = dateObj.getDay();
-                      const avail = (facility.availability || []).find((a) => a.dayOfWeek === dayOfWeek);
-                      if (!avail) return null;
-                      const opening = utcToLocal(avail.openingTime);
-                      const closing = utcToLocal(avail.closingTime);
-                      const slotDuration = avail.slotDuration;
-                      const headers = [];
-                      let current = new Date(opening.getTime());
-                      while (current < closing) {
-                        headers.push(current.toTimeString().slice(0,5));
-                        current = new Date(current.getTime() + slotDuration * 60000);
-                      }
-                      return headers.map(time => (
-                        <div key={time} className="font-bold text-[#426a5a] w-full">
-                          {time}
+                      const slots = availability[selectedDate]?.[selectedFacility] || [];
+                      return slots.map(slot => (
+                        <div key={slot.time} className="font-bold text-[#426a5a] w-full">
+                          {slot.time}
                         </div>
                       ));
                     })()}
@@ -352,25 +353,11 @@ export default function EditarDisponibilidadClient({ facilities: initialFaciliti
                     <div className="text-sm font-semibold text-[#426a5a] pr-2">
                       {facilities.find(f => f.id === selectedFacility)?.name}
                     </div>
+                    {/* Usar los mismos slots que los headers */}
                     {(() => {
-                      const facility = facilities.find(f => f.id === selectedFacility);
-                      if (!facility || !facility.availability) return null;
-                      const [year, month, day] = selectedDate.split('-').map(Number);
-                      const dateObj = new Date(year, month - 1, day);
-                      const dayOfWeek = dateObj.getDay();
-                      const avail = (facility.availability || []).find((a) => a.dayOfWeek === dayOfWeek);
-                      if (!avail) return null;
-                      const opening = utcToLocal(avail.openingTime);
-                      const closing = utcToLocal(avail.closingTime);
-                      const slotDuration = avail.slotDuration;
-                      const slots = [];
-                      let current = new Date(opening.getTime());
-                      while (current < closing) {
-                        slots.push(current.toTimeString().slice(0,5));
-                        current = new Date(current.getTime() + slotDuration * 60000);
-                      }
-                      return slots.map(time => {
-                        const slotObj = availability[selectedDate]?.[selectedFacility]?.find(s => s.time === time);
+                      const slots = availability[selectedDate]?.[selectedFacility] || [];
+                      return slots.map(slotObj => {
+                        const time = slotObj.time;
                         const tooltipText = slotObj?.available 
                           ? `${time} - Disponible`
                           : slotObj?.isConfirmedReservation && slotObj?.user

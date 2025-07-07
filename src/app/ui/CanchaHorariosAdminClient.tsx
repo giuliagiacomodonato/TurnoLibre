@@ -140,6 +140,7 @@ export default function CanchaHorariosAdminClient({ sedes: initialSedes = [], ca
               apertura: a.openingTime ? new Date(a.openingTime).toISOString().slice(11, 16) : "08:00",
               cierre: a.closingTime ? new Date(a.closingTime).toISOString().slice(11, 16) : "23:00",
               duracion: a.slotDuration?.toString() || "60",
+              updatedAt: a.updatedAt || null,
             })),
           }))
         );
@@ -267,7 +268,6 @@ export default function CanchaHorariosAdminClient({ sedes: initialSedes = [], ca
     <>
       <AdminHeader />
       <div className="max-w-5xl mx-auto py-10">
-        <h1 className="text-3xl font-bold text-[#426a5a] mb-8">Gestión de canchas</h1>
         {/* Selector de sede */}
         <div className="mb-6">
           <label className="block text-sm font-medium text-[#426a5a] mb-2">Seleccionar Sede</label>
@@ -366,6 +366,10 @@ export default function CanchaHorariosAdminClient({ sedes: initialSedes = [], ca
               <div className="text-[#426a5a] text-lg">Selecciona una cancha para editar sus datos y reglas de horarios.</div>
             )}
           </div>
+        </div>
+        {/* Aviso de vigencia de cambios al final */}
+        <div className="mt-10 p-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 rounded">
+          <strong>Aviso:</strong> Los cambios en las reglas de horarios y la creación o edición de canchas entran en vigencia a partir de los <b>7 días</b> de su modificación.
         </div>
         <Toast open={toast.open} message={toast.message} onClose={() => setToast({ ...toast, open: false })} />
       </div>

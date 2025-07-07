@@ -38,13 +38,17 @@ export default function ReservationsTableClient() {
   const [error, setError] = useState<string | null>(null);
   const [sports, setSports] = useState<Sport[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const estadoReservaFromUrl = searchParams.get("estado") || "";
+  const [estadoReserva, setEstadoReserva] = useState<string>(estadoReservaFromUrl);
+
+  useEffect(() => {
+    setEstadoReserva(estadoReservaFromUrl);
+  }, [estadoReservaFromUrl]);
 
   // Obtener filtros de la URL
   const deporteId = searchParams.get("deporte");
   const fechaInicio = searchParams.get("fechaInicio");
   const fechaFin = searchParams.get("fechaFin");
-  const hora = searchParams.get("hora") || "";
-  const estadoReserva = searchParams.get("estado") || "";
   const page = parseInt(searchParams.get("page") || "1");
 
   useEffect(() => {
@@ -198,7 +202,10 @@ export default function ReservationsTableClient() {
             <select
               className="w-full p-2 border rounded-md"
               value={estadoReserva}
-              onChange={(e) => handleFilterChange("estado", e.target.value)}
+              onChange={(e) => {
+                setEstadoReserva(e.target.value);
+                handleFilterChange("estado", e.target.value);
+              }}
             >
               <option value="">Todos los estados</option>
               <option value="PENDING">Pendiente</option>
@@ -235,31 +242,11 @@ export default function ReservationsTableClient() {
               />
             </div>
           </div>
-          <div>
-            <div className="flex justify-between items-center mb-1">
-              <label className="block text-sm font-medium text-gray-700">Hora de inicio</label>
-              {hora && (
-                <button
-                  onClick={() => handleFilterChange("hora", "")}
-                  className="text-xs text-gray-500 hover:text-gray-700"
-                >
-                  Limpiar
-                </button>
-              )}
-            </div>
-            <select
-              className="w-full p-2 border rounded-md"
-              value={hora}
-              onChange={(e) => handleFilterChange("hora", e.target.value)}
-            >
-              <option value="">Todas las horas</option>
-              {Array.from({ length: 15 }, (_, i) => i + 8).map((hour) => (
-                <option key={hour} value={`${hour.toString().padStart(2, '0')}:00`}>
-                  {`${hour.toString().padStart(2, '0')}:00`}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Elimina los bloques relacionados con el filtro de hora/hora de inicio:
+              - <label className="block text-sm font-medium text-gray-700">Hora de inicio</label>
+              - El select/input para hora
+              - Lógica de handleFilterChange para 'hora'
+              - Cualquier referencia a la variable 'hora' en los filtros */}
           <div>
             <div className="flex justify-between items-center mb-1">
               <label className="block text-sm font-medium text-gray-700">Buscar</label>
@@ -317,7 +304,10 @@ export default function ReservationsTableClient() {
           <select
             className="w-full p-2 border rounded-md"
             value={estadoReserva}
-            onChange={(e) => handleFilterChange("estado", e.target.value)}
+            onChange={(e) => {
+              setEstadoReserva(e.target.value);
+              handleFilterChange("estado", e.target.value);
+            }}
           >
             <option value="">Todos los estados</option>
             <option value="PENDING">Pendiente</option>
@@ -354,31 +344,11 @@ export default function ReservationsTableClient() {
             />
           </div>
         </div>
-        <div>
-          <div className="flex justify-between items-center mb-1">
-            <label className="block text-sm font-medium text-gray-700">Hora de inicio</label>
-            {hora && (
-              <button
-                onClick={() => handleFilterChange("hora", "")}
-                className="text-xs text-gray-500 hover:text-gray-700"
-              >
-                Limpiar
-              </button>
-            )}
-          </div>
-          <select
-            className="w-full p-2 border rounded-md"
-            value={hora}
-            onChange={(e) => handleFilterChange("hora", e.target.value)}
-          >
-            <option value="">Todas las horas</option>
-            {Array.from({ length: 15 }, (_, i) => i + 8).map((hour) => (
-              <option key={hour} value={`${hour.toString().padStart(2, '0')}:00`}>
-                {`${hour.toString().padStart(2, '0')}:00`}
-              </option>
-            ))}
-          </select>
-        </div>
+        {/* Elimina los bloques relacionados con el filtro de hora/hora de inicio:
+              - <label className="block text-sm font-medium text-gray-700">Hora de inicio</label>
+              - El select/input para hora
+              - Lógica de handleFilterChange para 'hora'
+              - Cualquier referencia a la variable 'hora' en los filtros */}
         <div>
           <div className="flex justify-between items-center mb-1">
             <label className="block text-sm font-medium text-gray-700">Buscar</label>

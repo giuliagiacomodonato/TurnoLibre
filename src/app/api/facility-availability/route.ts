@@ -21,38 +21,17 @@ export async function POST(request: NextRequest) {
 
     const results = [];
     for (const dow of daysToProcess) {
-      // Buscar si ya existe una regla para ese facility y dayOfWeek
-      const existing = await prisma.facilityAvailability.findFirst({
-        where: {
+      // Siempre crear una nueva regla, no sobrescribir la existente
+      const created = await prisma.facilityAvailability.create({
+        data: {
           facilityId,
           dayOfWeek: dow,
+          openingTime: new Date(`1970-01-01T${openingTime}:00Z`),
+          closingTime: new Date(`1970-01-01T${closingTime}:00Z`),
+          slotDuration: Number(slotDuration),
         },
       });
-
-      if (existing) {
-        // Actualizar
-        const updated = await prisma.facilityAvailability.update({
-          where: { id: existing.id },
-          data: {
-            openingTime: new Date(`1970-01-01T${openingTime}:00Z`),
-            closingTime: new Date(`1970-01-01T${closingTime}:00Z`),
-            slotDuration: Number(slotDuration),
-          },
-        });
-        results.push(updated);
-      } else {
-        // Crear
-        const created = await prisma.facilityAvailability.create({
-          data: {
-            facilityId,
-            dayOfWeek: dow,
-            openingTime: new Date(`1970-01-01T${openingTime}:00Z`),
-            closingTime: new Date(`1970-01-01T${closingTime}:00Z`),
-            slotDuration: Number(slotDuration),
-          },
-        });
-        results.push(created);
-      }
+      results.push(created);
     }
 
     return NextResponse.json(results);

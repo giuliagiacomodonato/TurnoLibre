@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useMemo, useEffect, Fragment } from 'react';
+import React, { useState, useMemo, useEffect, Fragment, ReactNode } from 'react';
 import { VenueInfo } from './VenueInfo';
 import { Header } from './Header';
 import { ReservationDetailsPopup } from './ReservationDetailsPopup';
@@ -75,8 +75,23 @@ export default function HomeClient({ sports: initialSports, locations: initialLo
         newAvailability[dateString] = {};
         const dayOfWeek = new Date(dateString).getDay();
         for (const facility of facilitiesForSport) {
-          // Buscar availability para ese día
-          const avail = (facility.availability || []).find((a: any) => a.dayOfWeek === dayOfWeek);
+          // Filtrar availabilities por createdAt >= 7 días antes de la fecha consultada
+          const availabilities = (facility.availability || [])
+            .filter(a => {
+              if (!a.createdAt) return true;
+              const created = new Date(a.createdAt);
+              return created <= new Date(new Date(dateString).getTime() - 7 * 24 * 60 * 60 * 1000);
+            })
+            .filter(a => a.dayOfWeek === dayOfWeek);
+          // Usar la regla más reciente que cumpla la condición
+          let avail = null;
+          if (availabilities.length > 0) {
+            avail = availabilities.reduce((latest, curr) => {
+              const latestDate = latest.createdAt ? new Date(latest.createdAt) : new Date(0);
+              const currDate = curr.createdAt ? new Date(curr.createdAt) : new Date(0);
+              return currDate > latestDate ? curr : latest;
+            }, availabilities[0]);
+          }
           if (!avail) continue;
           // Generar slots según openingTime, closingTime y slotDuration
           const opening = utcToLocal(avail.openingTime);
@@ -86,7 +101,7 @@ export default function HomeClient({ sports: initialSports, locations: initialLo
           let current = new Date(opening.getTime());
           while (current < closing) {
             const time = current.toTimeString().slice(0,5);
-            slots.push({ time, available: true, slotDuration });
+            slots.push({ time, available: true, slotDuration }); // slotDuration explícito
             current = new Date(current.getTime() + slotDuration * 60000);
           }
           // --- CACHE: Revisar localStorage ---
@@ -122,7 +137,7 @@ export default function HomeClient({ sports: initialSports, locations: initialLo
               const blockMinutes = blockHour * 60 + blockMinute;
               return blockMinutes === slotMinutes;
             });
-            return { ...slot, available: !blockedReservation };
+            return { ...slot, available: !blockedReservation, slotDuration: slot.slotDuration || 60 };
           });
         }
       }
@@ -167,7 +182,7 @@ export default function HomeClient({ sports: initialSports, locations: initialLo
     currentDate.setDate(currentDate.getDate() + 1);
     const nextDateString = getLocalDateString(currentDate);
     const maxDate = new Date();
-    maxDate.setDate(maxDate.getDate() + 7);
+    maxDate.setDate(maxDate.getDate() + 9);
     const maxDateString = getLocalDateString(maxDate);
     if (nextDateString <= maxDateString) {
       setSelectedDate(nextDateString);
@@ -240,32 +255,46 @@ export default function HomeClient({ sports: initialSports, locations: initialLo
     ? filteredFacilities.find(facility => facility.id === selectedSlot.facilityId)
     : null;
 
+  // Obtiene el slotDuration real del slot seleccionado
   const getSlotDurationForSelected = () => {
     if (!selectedSlot || !selectedFacilityDetails) return 60;
-    const facilityAvailabilities = selectedFacilityDetails.availability;
-    if (!facilityAvailabilities || facilityAvailabilities.length === 0) return 60;
-    const [year, month, day] = selectedDate.split('-').map(Number);
-    const dateObj = new Date(year, month - 1, day);
-    const dayOfWeek = dateObj.getDay();
-    const found = facilityAvailabilities.find((a: any) => a.dayOfWeek === dayOfWeek);
-    return found?.slotDuration || facilityAvailabilities[0].slotDuration || 60;
+    const slots = availability[selectedDate]?.[selectedSlot.facilityId] || [];
+    const slot = slots.find((s: { time: string }) => s.time === selectedSlot.time);
+    return slot?.slotDuration || 60;
   };
 
-  const groupedFacilitiesBySlot = useMemo(() => {
+  // Agrupación dinámica por horarios únicos (no por slotDuration)
+  const groupedFacilitiesByTimeHeaders = useMemo(() => {
     const sport = sports.find(s => s.id === selectedSport);
-    if (!sport) return {};
-    const groups: { [slotDuration: number]: Facility[] } = {};
+    if (!sport) return { groups: {}, headerMap: {} };
+    const groups: { [headerKey: string]: Facility[] } = {};
+    const headerMap: { [headerKey: string]: string[] } = {};
     for (const facility of sport.facilities) {
-      const [year, month, day] = selectedDate.split('-').map(Number);
-      const dateObj = new Date(year, month - 1, day);
-      const dayOfWeek = dateObj.getDay();
-      const avail = (facility.availability || []).find((a: any) => a.dayOfWeek === dayOfWeek);
-      const slotDuration = avail?.slotDuration || 60;
-      if (!groups[slotDuration]) groups[slotDuration] = [];
-      groups[slotDuration].push(facility);
+      const slots = availability[selectedDate]?.[facility.id] || [];
+      const times = slots.map((slot: { time: string }) => slot.time);
+      const headerKey = times.join('-');
+      if (!groups[headerKey]) {
+        groups[headerKey] = [];
+        headerMap[headerKey] = times;
+      }
+      groups[headerKey].push(facility);
     }
-    return groups;
-  }, [selectedSport, sports, selectedDate]);
+    return { groups, headerMap };
+  }, [selectedSport, sports, selectedDate, availability]);
+
+  // Construir horarios únicos para el grupo
+  const getGroupTimeHeaders = (
+    facilities: Facility[],
+    availability: Availability,
+    selectedDate: string
+  ): string[] => {
+    const allTimes = new Set<string>();
+    for (const facility of facilities) {
+      const slots = availability[selectedDate]?.[facility.id] || [];
+      slots.forEach((slot: { time: string }) => allTimes.add(slot.time));
+    }
+    return Array.from(allTimes).sort();
+  };
 
   useEffect(() => {
     if (showToast) {
@@ -398,47 +427,49 @@ export default function HomeClient({ sports: initialSports, locations: initialLo
                   </div>
                 </div>
               ) : (
-                Object.entries(groupedFacilitiesBySlot).map(([slotDuration, facilities]) => (
-                  <div key={slotDuration} className="mb-8">
-                    <div className="text-lg font-bold text-[#426a5a] mb-2">
-                      Turnos de {slotDuration} minutos
-                    </div>
+                Object.entries(groupedFacilitiesByTimeHeaders.groups || {}).map(([headerKey, facilities]) => {
+                  const timeHeaders = groupedFacilitiesByTimeHeaders.headerMap ? groupedFacilitiesByTimeHeaders.headerMap[headerKey] : [];
+                  return (
+                    <div key={headerKey} className="mb-8">
+                      {/* <div className="text-lg font-bold text-[#426a5a] mb-2">
+                        Horarios: {timeHeaders.join(', ')}
+                      </div> */}
                     <div className="overflow-x-auto w-full">
                       <div className="min-w-[600px] md:min-w-[900px] lg:min-w-[1100px] w-max">
-                        {/* Time Headers dinámicos */}
-                        <div className="grid grid-cols-[200px_repeat(18,1fr)] md:grid-cols-[300px_repeat(36,1fr)] gap-1 text-center mb-4">
+                          {/* Time Headers alineados */}
+                          <div className="grid grid-cols-[200px_repeat(36,1fr)] gap-1 text-center mb-4">
                           <div className="col-span-1 font-bold text-[#426a5a]">Cancha / Sede</div>
-                          {/* Tomar los headers del primer facility del grupo */}
-                          {(() => {
-                            const facility = facilities[0];
-                            const [year, month, day] = selectedDate.split('-').map(Number);
-                            const dateObj = new Date(year, month - 1, day);
-                            const dayOfWeek = dateObj.getDay();
-                            const avail = (facility.availability || []).find((a: any) => a.dayOfWeek === dayOfWeek);
-                            if (!avail) return null;
-                            const opening = utcToLocal(avail.openingTime);
-                            const closing = utcToLocal(avail.closingTime);
-                            const slotDuration = avail.slotDuration;
-                            const headers = [];
-                            let current = new Date(opening.getTime());
-                            while (current < closing) {
-                              headers.push(current.toTimeString().slice(0,5));
-                              current = new Date(current.getTime() + slotDuration * 60000);
-                            }
-                            return headers.map(time => (
+                            {timeHeaders.map((time: string) => (
                               <div key={time} className="font-bold text-[#426a5a] text-xs md:text-base">{time}</div>
-                            ));
-                          })()}
+                            ))}
                         </div>
-                        {/* Facility Rows */}
-                        {facilities.map(facility => (
-                          <div key={facility.id} className="grid grid-cols-[200px_repeat(18,1fr)] md:grid-cols-[300px_repeat(36,1fr)] gap-1 items-center mb-4">
+                          {/* Facility Rows alineadas */}
+                          {(facilities as Facility[]).map((facility: Facility) => {
+                            const slots = availability[selectedDate]?.[facility.id] || [];
+                            if (slots.length === 0) {
+                              return (
+                                <div key={facility.id} className="grid grid-cols-[200px_repeat(36,1fr)] gap-1 items-center mb-4">
+                                  <div className="text-xs md:text-sm font-semibold text-[#426a5a] pr-2">
+                                    <div>{facility.name}</div>
+                                    <div className="text-xs text-gray-500">{facility.location?.name}</div>
+                                  </div>
+                                  <div className="col-span-full text-left text-gray-500 my-4 pl-2">
+                                    No hay horarios disponibles para este día.
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return (
+                              <div key={facility.id} className="grid grid-cols-[200px_repeat(36,1fr)] gap-1 items-center mb-4">
                             <div className="text-xs md:text-sm font-semibold text-[#426a5a] pr-2">
                               <div>{facility.name}</div>
                               <div className="text-xs text-gray-500">{facility.location?.name}</div>
                             </div>
-                            {availability[selectedDate]?.[facility.id]?.map(slot => {
-                              // Calcular si el slot es pasado
+                                {timeHeaders.map((time: string) => {
+                                  const slot = slots.find((s: { time: string }) => s.time === time);
+                                  if (!slot) {
+                                    return <div key={time} className="h-10 w-12 md:h-12 md:w-16 rounded-lg mx-1 my-1 bg-gray-100" style={{ minWidth: '3rem', minHeight: '2.5rem' }} />;
+                                  }
                               let isPast = false;
                               if (selectedDate === getLocalDateString(new Date())) {
                                 const now = new Date();
@@ -460,12 +491,12 @@ export default function HomeClient({ sports: initialSports, locations: initialLo
                                   title={`${slot.time} - ${notAvailable ? 'No disponible' : 'Disponible'}`}
                                   onClick={() => handleSlotClick(facility.id, slot.time, slot.available && !isPast)}
                                 >
-                                  {/* Sin hora dentro del slot */}
                                 </div>
                               );
                             })}
                           </div>
-                        ))}
+                            );
+                          })}
                         {facilities.length === 0 && (
                           <div className="col-span-full text-center text-gray-600 mt-8">
                             No hay canchas disponibles para este deporte.
@@ -474,7 +505,8 @@ export default function HomeClient({ sports: initialSports, locations: initialLo
                       </div>
                     </div>
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
             {/* Galería e info de sede */}
