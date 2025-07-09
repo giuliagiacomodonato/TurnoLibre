@@ -28,9 +28,11 @@ export default function SuccessPageContent() {
     const payment_id = searchParams.get('payment_id');
     // Solo ejecutar si hay payment_id y items
     if (!payment_id || items.length === 0) return;
-    // Si ya se procesó este payment_id, no volver a ejecutar
-    if (processed.current === payment_id) return;
-    // Marcar como procesado SOLO después de ejecutar la lógica
+    // Controlar en localStorage si ya se procesó este payment_id
+    if (typeof window !== 'undefined') {
+      const lastProcessed = localStorage.getItem('last_payment_id');
+      if (lastProcessed === payment_id) return;
+    }
     // Prepare items with proper UTC date/time format
     const processedItems = items.map(item => {
       return {
@@ -80,12 +82,16 @@ export default function SuccessPageContent() {
             .finally(() => {
               console.log('[WEBHOOK] clear() ejecutado');
               clear();
-              processed.current = payment_id; // Marcar como procesado SOLO después de todo
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('last_payment_id', payment_id);
+              }
             });
           } else {
             console.log('[WEBHOOK] clear() ejecutado (sin sesión)');
             clear();
-            processed.current = payment_id;
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('last_payment_id', payment_id);
+            }
           }
         }
       })
