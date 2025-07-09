@@ -9,7 +9,7 @@ export default function SuccessPageContent() {
   const { items, clear, isHydrated } = useCart();
   const searchParams = useSearchParams();
   const { data: session } = useSession();
-  const processed = useRef(false);
+  const processed = useRef('');
 
   // Convert local date and time to UTC for database storage
   const formatDateTimeToUTC = (dateStr: string, timeStr: string) => {
@@ -26,63 +26,72 @@ export default function SuccessPageContent() {
 
   useEffect(() => {
     const payment_id = searchParams.get('payment_id');
-    if (payment_id && items.length > 0 && !processed.current) {
-      processed.current = true;
-      // Prepare items with proper UTC date/time format
-      const processedItems = items.map(item => {
-        // Create a copy of the item with date properly formatted for UTC
-        return {
-          ...item,
-          // Store the original values
-          localDate: item.date,
-          localTime: item.time,
-          // Add UTC formatted startTime
-          startTimeUTC: formatDateTimeToUTC(item.date, item.time)
-        };
-      });
-
-      console.log('Sending checkout with UTC times:', processedItems);
-
-      fetch('/api/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          payment_id, 
-          items: processedItems, 
-          estado: 'success' 
-        }),
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) {
-            // --- WEBHOOK ---
-            if (session?.user) {
-              fetch('https://turnolibre.app.n8n.cloud/webhook/turnolibreEmail', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  nombre: session.user.name,
-                  email: session.user.email,
-                  reservas: items.map(r => ({
-                    fecha: r.date,
-                    hora: r.time,
-                    cancha: r.court || r.facilityId,
-                  })),
-                }),
-              })
-              .catch(() => {})
-              .finally(() => {
-                clear(); // Vaciar carrito SOLO después del webhook
-              });
-            } else {
-              clear(); // Si no hay sesión, igual vaciar después
-            }
+    // Solo ejecutar si hay payment_id y items
+    if (!payment_id || items.length === 0) return;
+    // Si ya se procesó este payment_id, no volver a ejecutar
+    if (processed.current === payment_id) return;
+    // Marcar como procesado SOLO después de ejecutar la lógica
+    // Prepare items with proper UTC date/time format
+    const processedItems = items.map(item => {
+      return {
+        ...item,
+        localDate: item.date,
+        localTime: item.time,
+        startTimeUTC: formatDateTimeToUTC(item.date, item.time)
+      };
+    });
+    console.log('Sending checkout with UTC times:', processedItems);
+    fetch('/api/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        payment_id, 
+        items: processedItems, 
+        estado: 'success' 
+      }),
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          if (session?.user) {
+            const reservasPayload = items.map(r => ({
+              fecha: r.date,
+              hora: r.time,
+              cancha: r.court || r.facilityId,
+            }));
+            const webhookBody = {
+              nombre: session.user.name,
+              email: session.user.email,
+              reservas: reservasPayload,
+            };
+            console.log('[WEBHOOK] Enviando a n8n:', webhookBody);
+            fetch('https://turnolibre.app.n8n.cloud/webhook/turnolibreEmail', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(webhookBody),
+            })
+            .then(async res => {
+              const text = await res.text();
+              console.log('[WEBHOOK] Respuesta:', res.status, text);
+            })
+            .catch(err => {
+              console.error('[WEBHOOK] Error al enviar:', err);
+            })
+            .finally(() => {
+              console.log('[WEBHOOK] clear() ejecutado');
+              clear();
+              processed.current = payment_id; // Marcar como procesado SOLO después de todo
+            });
+          } else {
+            console.log('[WEBHOOK] clear() ejecutado (sin sesión)');
+            clear();
+            processed.current = payment_id;
           }
-        })
-        .catch(err => {
-          console.error("Error processing checkout:", err);
-        });
-    }
+        }
+      })
+      .catch(err => {
+        console.error("Error processing checkout:", err);
+      });
   }, [searchParams, items, clear, session]);
 
   if (!isHydrated) return null;
