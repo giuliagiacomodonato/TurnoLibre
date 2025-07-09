@@ -55,8 +55,6 @@ export default function SuccessPageContent() {
         .then(res => res.json())
         .then(data => {
           if (data.success) {
-            // Copia los items ANTES de limpiar el carrito
-            const itemsToSend = [...items];
             // --- WEBHOOK ---
             if (session?.user) {
               fetch('https://turnolibre.app.n8n.cloud/webhook/turnolibreEmail', {
@@ -65,7 +63,7 @@ export default function SuccessPageContent() {
                 body: JSON.stringify({
                   nombre: session.user.name,
                   email: session.user.email,
-                  reservas: itemsToSend.map(r => ({
+                  reservas: items.map(r => ({
                     fecha: r.date,
                     hora: r.time,
                     cancha: r.court || r.facilityId,
