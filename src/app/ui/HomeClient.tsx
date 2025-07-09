@@ -554,11 +554,7 @@ export default function HomeClient({ sports: initialSports, locations: initialLo
           </div>
         </div>
       </main>
-      <div className="w-full flex justify-center pb-8">
-        <a href="/FAQ" className="text-[#426a5a] underline hover:text-[#7fb685] text-lg font-semibold">
-          Preguntas frecuentes 
-        </a>
-      </div>
+     
       {/* Footer */}
       <footer className="bg-[#426a5a]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Toast } from "../ui/Toast";
 import { AdminHeader } from "../ui/Header";
 import type { CanchaHorariosAdminClientProps, Facility, Location, LocationSchedule } from '@/lib/types';
@@ -8,7 +8,38 @@ import { DAYS_OF_WEEK, DIAS_ORDEN } from '@/lib/utils';
 function ReglasHorarios({ reglas, setReglas, location }: { reglas: any[]; setReglas: (r: any[]) => void, location: any }) {
   const [nueva, setNueva] = useState({ dia: "Todos", apertura: "08:00", cierre: "23:00", duracion: "60" });
 
-  // Obtener horarios permitidos según el día y la sede
+  // --- LIMPIEZA AUTOMÁTICA DE REGLAS VIEJAS ---
+  useEffect(() => {
+    const hoy = new Date();
+    hoy.setHours(0,0,0,0);
+    const reglasConVigencia = reglas.map(regla => {
+      const fechaCreacion = regla.updatedAt ? new Date(regla.updatedAt) : null;
+      const fechaVigencia = fechaCreacion ? new Date(fechaCreacion.getTime() + 8 * 24 * 60 * 60 * 1000) : null;
+      return { ...regla, fechaVigencia };
+    });
+    const hayVigenteHoy = reglasConVigencia.some(r => r.fechaVigencia && r.fechaVigencia.toDateString() === hoy.toDateString());
+    if (hayVigenteHoy) {
+      const nuevasReglas = reglasConVigencia.filter(r => !r.fechaVigencia || r.fechaVigencia >= hoy);
+      if (nuevasReglas.length !== reglas.length) {
+        setReglas(nuevasReglas.map(({fechaVigencia, ...rest}) => rest));
+      }
+    }
+  }, [reglas, setReglas]);
+
+  // Agrupar reglas por fecha de vigencia (string)
+  const reglasConVigencia = reglas.map(regla => {
+    const fechaCreacion = regla.updatedAt ? new Date(regla.updatedAt) : null;
+    const fechaVigencia = fechaCreacion ? new Date(fechaCreacion.getTime() + 8 * 24 * 60 * 60 * 1000) : null;
+    return { ...regla, fechaCreacion, fechaVigencia };
+  });
+  const reglasAgrupadas = reglasConVigencia.reduce((acc: Record<string, any[]>, regla) => {
+    const key = regla.fechaVigencia ? regla.fechaVigencia.toLocaleDateString() : '-';
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(regla);
+    return acc;
+  }, {});
+
+  // Variables y funciones para el formulario
   const getScheduleForDay = (dia: string) => {
     if (!location || !location.schedules) return null;
     if (dia === "Todos") return null;
@@ -16,12 +47,10 @@ function ReglasHorarios({ reglas, setReglas, location }: { reglas: any[]; setReg
     const idx = dias.indexOf(dia);
     return location.schedules.find((s: any) => s.dayOfWeek === idx);
   };
-
   const schedule = getScheduleForDay(nueva.dia);
   const isClosed = schedule && !schedule.isOpen;
   const minApertura = schedule ? schedule.openingTime.slice(0,5) : "08:00";
   const maxCierre = schedule ? schedule.closingTime.slice(0,5) : "23:00";
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setNueva({ ...nueva, [e.target.name]: e.target.value });
   };
@@ -29,62 +58,79 @@ function ReglasHorarios({ reglas, setReglas, location }: { reglas: any[]; setReg
     setReglas([...reglas, { ...nueva, duracion: nueva.duracion.toString(), id: Date.now() }]);
     setNueva({ dia: "Todos", apertura: "08:00", cierre: "23:00", duracion: "60" });
   };
-  const eliminarRegla = (id: number) => {
-    setReglas(reglas.filter(r => r.id !== id));
-  };
+
+  // --- DESKTOP & MOBILE ---
   return (
     <div className="bg-white/90 rounded-2xl shadow-xl p-6 mb-8">
       <h2 className="text-xl font-bold text-[#426a5a] mb-4">Reglas de horarios</h2>
-      {/* Tabla en desktop, bloques en mobile */}
       <div className="mb-4">
         <div className="hidden md:block">
-          <table className="w-full">
-            <thead>
-              <tr className="text-[#426a5a] text-left">
-                <th>Día de semana</th>
-                <th>Apertura</th>
-                <th>Cierre</th>
-                <th>Duración (min)</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {reglas.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="text-center text-gray-400 py-4">No hay reglas para esta cancha</td>
-                </tr>
-              ) : (
-                reglas.map(regla => (
-                  <tr key={regla.id} className="border-b last:border-b-0">
-                    <td className="py-2">{regla.dia}</td>
-                    <td>{regla.apertura}</td>
-                    <td>{regla.cierre}</td>
-                    <td>{regla.duracion.toString()}</td>
-                    <td>
-                      <button onClick={() => eliminarRegla(regla.id)} className="text-red-500 hover:underline ml-2">Eliminar</button>
-                    </td>
+          {Object.entries(reglasAgrupadas).map(([vigencia, grupo]) => (
+            <div key={vigencia} className="mb-8 border rounded-lg p-4 bg-gray-50 overflow-x-auto relative">
+              <div className="font-semibold text-[#426a5a] mb-2">Vigencia desde: {vigencia}</div>
+              <table className="w-full border-separate border-spacing-0">
+                <thead>
+                  <tr className="text-[#426a5a] text-left">
+                    <th style={{minWidth:'120px'}} className="px-2">Día de semana</th>
+                    <th style={{minWidth:'90px'}} className="px-2">Apertura</th>
+                    <th style={{minWidth:'90px'}} className="px-2">Cierre</th>
+                    <th style={{minWidth:'110px'}} className="px-2">Duración (min)</th>
+                    <th style={{minWidth:'120px'}} className="px-2">Fecha de creación</th>
+                    <th style={{minWidth:'16px'}} className="px-0 text-center"></th>
                   </tr>
+                </thead>
+                <tbody>
+                  {grupo.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="text-center text-gray-400 py-4">No hay reglas para esta cancha</td>
+                    </tr>
+                  ) : (
+                    grupo.map((regla, idx) => (
+                      <tr key={regla.id || idx} className="border-b last:border-b-0">
+                        <td className="py-2 px-2">{regla.dia}</td>
+                        <td className="px-2">{regla.apertura}</td>
+                        <td className="px-2">{regla.cierre}</td>
+                        <td className="px-2">{regla.duracion.toString()}</td>
+                        <td className="px-2">{regla.fechaCreacion ? regla.fechaCreacion.toLocaleDateString() : '-'}</td>
+                        <td className="px-0 text-center">
+                          <button onClick={() => setReglas(reglas.filter(r => r.id !== regla.id))} className="text-red-500 hover:underline p-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </div>
+        {/* --- MOBILE --- */}
+        <div className="md:hidden flex flex-col gap-4">
+          {Object.entries(reglasAgrupadas).map(([vigencia, grupo]) => (
+            <div key={vigencia} className="mb-4 border rounded-lg p-3 bg-gray-50">
+              <div className="font-semibold text-[#426a5a] mb-2">Vigencia desde: {vigencia}</div>
+              {grupo.length === 0 ? (
+                <div className="text-center text-gray-400 py-4">No hay reglas para esta cancha</div>
+              ) : (
+                grupo.map((regla, idx) => (
+                  <div key={regla.id || idx} className="flex flex-col gap-1 border-b last:border-b-0 pb-2 mb-2">
+                    <div><span className="font-semibold text-[#426a5a]">Día:</span> {regla.dia}</div>
+                    <div><span className="font-semibold text-[#426a5a]">Apertura:</span> {regla.apertura}</div>
+                    <div><span className="font-semibold text-[#426a5a]">Cierre:</span> {regla.cierre}</div>
+                    <div><span className="font-semibold text-[#426a5a]">Duración:</span> {regla.duracion} min</div>
+                    <div><span className="font-semibold text-[#426a5a]">Fecha de creación:</span> {regla.fechaCreacion ? regla.fechaCreacion.toLocaleDateString() : '-'}</div>
+                    <button onClick={() => setReglas(reglas.filter(r => r.id !== regla.id))} className="text-red-500 hover:underline p-0 mt-1 self-end">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                    </button>
+                  </div>
                 ))
               )}
-            </tbody>
-          </table>
-        </div>
-        <div className="md:hidden flex flex-col gap-4">
-          {reglas.length === 0 ? (
-            <div className="text-center text-gray-400 py-4">No hay reglas para esta cancha</div>
-          ) : (
-            reglas.map(regla => (
-              <div key={regla.id} className="flex flex-col gap-1 border rounded-lg p-3 bg-gray-50">
-                <div><span className="font-semibold text-[#426a5a]">Día:</span> {regla.dia}</div>
-                <div><span className="font-semibold text-[#426a5a]">Apertura:</span> {regla.apertura}</div>
-                <div><span className="font-semibold text-[#426a5a]">Cierre:</span> {regla.cierre}</div>
-                <div><span className="font-semibold text-[#426a5a]">Duración:</span> {regla.duracion} min</div>
-                <button onClick={() => eliminarRegla(regla.id)} className="text-red-500 hover:underline mt-1 self-end">Eliminar</button>
-              </div>
-            ))
-          )}
+            </div>
+          ))}
         </div>
       </div>
+      {/* Formulario para agregar/editar reglas */}
       <div className="flex flex-wrap gap-4 items-end">
         <div>
           <label className="block text-[#426a5a] font-semibold mb-1">Día</label>
@@ -127,6 +173,9 @@ export default function CanchaHorariosAdminClient({ sedes: initialSedes = [], ca
   const [nuevo, setNuevo] = useState({ nombre: "", precio: "", deporte: "", descripcion: "", reglas: [] });
   const [toast, setToast] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
   const [sports, setSports] = useState<any[]>(initialSports);
+
+  // 1. Estado para el modal de confirmación
+  const [modalEliminar, setModalEliminar] = useState<{ open: boolean; canchaId: string | null }>({ open: false, canchaId: null });
 
   // Cargar sedes al inicio
   useEffect(() => {
@@ -308,6 +357,60 @@ export default function CanchaHorariosAdminClient({ sedes: initialSedes = [], ca
     }
   };
 
+  // 1. Agrega la función guardarDatosCancha
+  const guardarDatosCancha = async () => {
+    if (!cancha) return;
+    const sportId = getSportIdByName(sports, cancha.deporte);
+    if (!sportId) {
+      setToast({ open: true, message: "Deporte no válido" });
+      return;
+    }
+    const res = await fetch(`/api/facilities/${cancha.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: cancha.nombre,
+        description: cancha.descripcion,
+        price: Number(cancha.precio),
+        sportId,
+        locationId: selectedSede,
+      }),
+    });
+    if (res.ok) {
+      setToast({ open: true, message: "Datos de la cancha actualizados" });
+    } else {
+      const errorText = await res.text();
+      setToast({ open: true, message: `Error al actualizar datos: ${errorText}` });
+    }
+  };
+
+  // 2. Agrega la función guardarReglasCancha
+  const guardarReglasCancha = async () => {
+    if (!cancha) return;
+    if (!validarReglasConHorarioDeSede(cancha.reglas, cancha.location)) {
+      setToast({ open: true, message: "Hay reglas fuera del horario permitido por el complejo." });
+      return;
+    }
+    for (const regla of cancha.reglas) {
+      let dayOfWeek: number | null = null;
+      if (regla.dia === "Todos") dayOfWeek = null;
+      else if (regla.dia === "Feriados") dayOfWeek = 7;
+      else dayOfWeek = DIAS_ORDEN.indexOf(regla.dia);
+      await fetch("/api/facility-availability", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          facilityId: cancha.id,
+          dayOfWeek,
+          openingTime: regla.apertura,
+          closingTime: regla.cierre,
+          slotDuration: Number(regla.duracion),
+        }),
+      });
+    }
+    setToast({ open: true, message: "Reglas de horarios actualizadas" });
+  };
+
   return (
     <>
       <AdminHeader />
@@ -333,7 +436,7 @@ export default function CanchaHorariosAdminClient({ sedes: initialSedes = [], ca
               {canchas.map(c => (
                 <li key={c.id} className={`flex items-center justify-between mb-2 ${selected === c.id ? 'bg-[#f2c57c]/40' : ''} rounded-lg px-2 py-1`}>
                   <button onClick={() => setSelected(c.id)} className="text-left flex-1 text-[#426a5a] font-semibold">{c.name}</button>
-                  <button onClick={() => eliminarCancha(c.id)} className="ml-2 text-red-500 hover:underline">Eliminar</button>
+                  <button onClick={() => setModalEliminar({ open: true, canchaId: c.id })} className="ml-2 text-red-500 hover:underline">Eliminar</button>
                 </li>
               ))}
             </ul>
@@ -401,9 +504,12 @@ export default function CanchaHorariosAdminClient({ sedes: initialSedes = [], ca
                     />
                   </div>
                 </div>
+                <div className="flex justify-end mb-4">
+                  <button onClick={guardarDatosCancha} className="bg-[#426a5a] text-white font-bold px-6 py-2 rounded-lg shadow hover:bg-[#7fb685] transition-colors">Guardar datos</button>
+                </div>
                 <ReglasHorarios reglas={cancha.reglas || []} setReglas={setReglas} location={cancha.location} />
-                <div className="flex justify-end">
-                  <button onClick={guardarCancha} className="bg-[#426a5a] text-white font-bold px-6 py-2 rounded-lg shadow hover:bg-[#7fb685] transition-colors">Guardar cambios</button>
+                <div className="flex justify-end mt-4">
+                  <button onClick={guardarReglasCancha} className="bg-[#426a5a] text-white font-bold px-6 py-2 rounded-lg shadow hover:bg-[#7fb685] transition-colors">Guardar reglas</button>
                 </div>
               </div>
             ) : (
@@ -414,7 +520,38 @@ export default function CanchaHorariosAdminClient({ sedes: initialSedes = [], ca
         {/* Aviso de vigencia de cambios al final */}
         <div className="mt-10 p-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 rounded">
           <strong>Aviso:</strong> Los cambios en las reglas de horarios y la creación o edición de canchas entran en vigencia a partir de los <b>7 días</b> de su modificación.
+                Al eliminar reglas por favor siempre agregar una nueva regla con el mismo día.
+                Para reflejar si un día está cerrado, por favor agregar una regla con el mismo día y apertura y cierre a la misma hora.
         </div>
+        {modalEliminar.open && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div className="bg-white rounded-lg shadow-xl p-8 max-w-xs w-full flex flex-col items-center">
+      <h3 className="text-lg font-bold text-red-600 mb-4 text-center">Confirmar eliminación</h3>
+      <p className="mb-6 text-gray-700 text-center">
+        ¿Estás seguro de que quieres eliminar esta cancha? Esta acción no se puede deshacer.
+      </p>
+      <div className="flex justify-center gap-2 w-full">
+        <button
+          className="px-4 py-2 rounded bg-gray-200 text-gray-700 hover:bg-gray-300"
+          onClick={() => setModalEliminar({ open: false, canchaId: null })}
+        >
+          Cancelar
+        </button>
+        <button
+          className="px-4 py-2 rounded font-bold bg-red-500 text-white hover:bg-red-600"
+          onClick={async () => {
+            if (modalEliminar.canchaId) {
+              await eliminarCancha(modalEliminar.canchaId);
+            }
+            setModalEliminar({ open: false, canchaId: null });
+          }}
+        >
+          Eliminar
+        </button>
+      </div>
+    </div>
+  </div>
+)}
         <Toast open={toast.open} message={toast.message} onClose={() => setToast({ ...toast, open: false })} />
       </div>
     </>

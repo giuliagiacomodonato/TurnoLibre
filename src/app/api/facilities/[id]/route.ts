@@ -43,6 +43,8 @@ export async function DELETE(
   const { id } = await params;
 
   try {
+    // Eliminar reglas asociadas antes de borrar la cancha
+    await prisma.facilityAvailability.deleteMany({ where: { facilityId: id } });
     await prisma.facility.delete({ where: { id } });
     return NextResponse.json({ success: true });
   } catch (error) {
