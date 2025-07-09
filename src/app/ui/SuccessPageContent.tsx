@@ -54,22 +54,26 @@ export default function SuccessPageContent() {
       })
         .then(res => res.json())
         .then(data => {
-          if (data.success) clear();
-          // --- WEBHOOK ---
-          if (session?.user) {
-            fetch('https://turnolibre.app.n8n.cloud/webhook/turnolibreEmail', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                nombre: session.user.name,
-                email: session.user.email,
-                reservas: items.map(r => ({
-                  fecha: r.date,
-                  hora: r.time,
-                  cancha: r.court || r.facilityId,
-                })),
-              }),
-            }).catch(() => {});
+          if (data.success) {
+            // Copia los items ANTES de limpiar el carrito
+            const itemsToSend = [...items];
+            clear();
+            // --- WEBHOOK ---
+            if (session?.user) {
+              fetch('https://turnolibre.app.n8n.cloud/webhook/turnolibreEmail', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  nombre: session.user.name,
+                  email: session.user.email,
+                  reservas: itemsToSend.map(r => ({
+                    fecha: r.date,
+                    hora: r.time,
+                    cancha: r.court || r.facilityId,
+                  })),
+                }),
+              }).catch(() => {});
+            }
           }
         })
         .catch(err => {
