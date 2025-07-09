@@ -57,7 +57,6 @@ export default function SuccessPageContent() {
           if (data.success) {
             // Copia los items ANTES de limpiar el carrito
             const itemsToSend = [...items];
-            clear();
             // --- WEBHOOK ---
             if (session?.user) {
               fetch('https://turnolibre.app.n8n.cloud/webhook/turnolibreEmail', {
@@ -72,7 +71,13 @@ export default function SuccessPageContent() {
                     cancha: r.court || r.facilityId,
                   })),
                 }),
-              }).catch(() => {});
+              })
+              .catch(() => {})
+              .finally(() => {
+                clear(); // Vaciar carrito SOLO después del webhook
+              });
+            } else {
+              clear(); // Si no hay sesión, igual vaciar después
             }
           }
         })
