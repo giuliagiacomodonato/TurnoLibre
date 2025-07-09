@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 
 export default function SuccessPageContent() {
-  const { items, clear } = useCart();
+  const { items, clear, isHydrated } = useCart();
   const searchParams = useSearchParams();
   const { data: session } = useSession();
   const processed = useRef(false);
@@ -86,6 +86,8 @@ export default function SuccessPageContent() {
         });
     }
   }, [searchParams, items, clear, session]);
+
+  if (!isHydrated) return null;
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-green-50">

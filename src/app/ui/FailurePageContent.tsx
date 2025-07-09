@@ -5,7 +5,7 @@ import { useCart } from '../ui/CartContext';
 import { useSearchParams } from 'next/navigation';
 
 export default function FailurePageContent() {
-  const { items } = useCart();
+  const { items, isHydrated } = useCart();
   const searchParams = useSearchParams();
 
   useEffect(() => {
@@ -15,6 +15,8 @@ export default function FailurePageContent() {
       console.log('Payment failed:', payment_id);
     }
   }, [searchParams]);
+
+  if (!isHydrated) return null;
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-red-50">

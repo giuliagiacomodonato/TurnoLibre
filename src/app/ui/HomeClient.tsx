@@ -7,7 +7,7 @@ import { LoginModal } from './LoginModal';
 import { useCart } from './CartContext';
 import { toZonedTime } from 'date-fns-tz';
 import { format, parseISO } from 'date-fns';
-import type { Sport, Facility, FacilityAvailability, Location, LocationSchedule, Reservation, Availability, AvailabilitySlot } from '@/lib/types';
+import type { Sport, Facility, Location, LocationSchedule } from '@/lib/types';
 
 export default function HomeClient({ sports: initialSports, locations: initialLocations, facilities: initialFacilities }: { sports: Sport[]; locations: Location[]; facilities: Facility[] }) {
   const [sports, setSports] = useState<Sport[]>(initialSports);
@@ -18,8 +18,8 @@ export default function HomeClient({ sports: initialSports, locations: initialLo
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [selectedSlot, setSelectedSlot] = useState<{ facilityId: string; time: string; } | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const { addItem } = useCart();
-  const [availability, setAvailability] = useState<Availability>({});
+  const { addItem, isHydrated } = useCart();
+  const [availability, setAvailability] = useState<any>({}); // Changed to any as types are removed
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -68,7 +68,7 @@ export default function HomeClient({ sports: initialSports, locations: initialLo
     try {
       // Solo facilities del deporte seleccionado
       const facilitiesForSport = initialFacilities.filter(f => f.sportId === selectedSport);
-      const newAvailability: Availability = {};
+      const newAvailability: any = {}; // Changed to any as types are removed
       // Solo el día seleccionado
       const daysToFetch = [selectedDate];
       for (const dateString of daysToFetch) {
@@ -285,7 +285,7 @@ export default function HomeClient({ sports: initialSports, locations: initialLo
   // Construir horarios únicos para el grupo
   const getGroupTimeHeaders = (
     facilities: Facility[],
-    availability: Availability,
+    availability: any, // Changed to any as types are removed
     selectedDate: string
   ): string[] => {
     const allTimes = new Set<string>();
@@ -304,6 +304,8 @@ export default function HomeClient({ sports: initialSports, locations: initialLo
       return () => clearTimeout(timer);
     }
   }, [showToast]);
+
+  if (!isHydrated) return null;
 
   if (!location) {
     return <div>Cargando...</div>;

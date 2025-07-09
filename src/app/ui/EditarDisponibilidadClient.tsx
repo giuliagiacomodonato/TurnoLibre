@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { Toast } from "./Toast";
 import { AdminHeader } from "./Header";
-import type { Facility, Reservation, Availability } from "@/lib/types";
+import type { Facility, Availability } from "@/lib/types";
 
 function getLocalDateString(date: Date) {
   const year = date.getFullYear();

@@ -5,33 +5,46 @@ import { AdminHeader } from "../../ui/Header";
 
 const adminFaqs = [
   {
-    q: '¿Cuál es el precio del sistema?',
-    a: 'Tenemos distintos planes de acuerdo a la cantidad de canchas y el país donde se encuentre la cancha. Te invitamos a ver los precios en la sección de planes.'
+    q: '¿Cómo funciona el acceso de administrador?',
+    a: 'El acceso de administrador se otorga a los responsables del club o complejo. Desde el panel pueden gestionar canchas, horarios, reservas y reglas.'
+  },
+ 
+  {
+    q: '¿Cuántos usuarios administradores puedo tener?',
+    a: 'Puedes tener varios administradores por club. Cada uno puede acceder con su cuenta y gestionar las reservas y la información del complejo.'
   },
   {
-    q: '¿Se pueden cobrar señas a través de la página?',
-    a: 'Sí, puedes configurar la modalidad "tarjeta en garantía", donde el usuario deberá cargar los datos de una tarjeta para poder hacer la reserva. Si la persona que hizo la reserva no cumple con la política de cancelación o falta a jugar se debitará el monto de la seña.'
+    q: '¿Puedo cargar reservas internas o turnos fijos?',
+    a: 'Sí, desde el panel puedes cargar reservas manualmente para turnos fijos, eventos o bloqueos de horario.'
   },
   {
-    q: '¿Cuántos usuarios administradores se puede tener?',
-    a: 'Puedes tener la cantidad de usuarios que necesites con los diferentes permisos y asignarles un rol según sus funciones. No tiene costo extra por usuario, está todo incluido en el plan.'
+    q: '¿Se pueden configurar precios especiales por día y horario?',
+    a: 'Puedes definir reglas de horarios y precios para cada cancha según el día de la semana y la franja horaria, desde la sección de administración.'
   },
   {
-    q: '¿Se pueden cargar reservas de manera interna además de recibir reservas online?',
-    a: 'Sí, puedes gestionar tu club de manera interna con la posibilidad de cargar turnos fijos, eventos de cumpleaños y torneos.'
+    q: '¿Qué soporte ofrecen para administradores?',
+    a: 'Ofrecemos soporte por email y, si es necesario, reuniones virtuales para explicar el uso del sistema y resolver dudas.'
   },
   {
-    q: '¿Se pueden configurar precios especiales según el día y horario?',
-    a: 'Sí, puedes personalizar precios por cada día de la semana y configurar precios por horarios ajustándolo a la dinámica de tu club.'
+    q: '¿Cómo veo y gestiono las reservas de los usuarios?',
+    a: 'En la sección “Ver reservas” puedes ver todas las reservas activas, pasadas y canceladas, y filtrar por fecha, cancha o usuario.'
   },
   {
-    q: '¿Se puede agregar los consumos que realice el cliente?',
-    a: 'Puedes agregar los productos que consumen tus clientes en sus reservas y tener un detalle al momento de cobrarle.'
+    q: '¿Cómo creo o edito las reglas de horarios de una cancha?',
+    a: 'Desde el panel de administración, selecciona la cancha y utiliza la sección “Reglas de horarios”. Puedes agregar, editar o eliminar reglas para definir los días, horarios de apertura/cierre y duración de los turnos. Recuerda guardar los cambios para que se apliquen.'
   },
   {
-    q: '¿Cuentan con capacitación y soporte para el uso del sistema?',
-    a: 'Sí, al dar comienzo a tu período de prueba gratuito programamos una reunión virtual con el área de soporte donde podrás ver las diferentes funcionalidades del sistema y comunicarte con el equipo para resolver dudas que vayan surgiendo.'
+    q: '¿Cómo hago para que un día figure como cerrado?',
+    a: 'Para indicar que una cancha está cerrada un día, agrega una regla para ese día con el mismo horario de apertura y cierre (por ejemplo, apertura 08:00 y cierre 08:00). Así, los usuarios no podrán reservar en ese día.'
   },
+  {
+    q: '¿Qué pasa si elimino una regla de horario?',
+    a: 'Si eliminas una regla, ese día u horario quedará sin disponibilidad para reservas, a menos que agregues una nueva regla para ese día. Es recomendable siempre agregar una nueva regla si eliminas otra.'
+  },
+  {
+    q: '¿Cuándo entran en vigencia los cambios en las reglas?',
+    a: 'Los cambios en las reglas de horarios (creación, edición o eliminación) entran en vigencia a los 7 días de realizados. Esto permite avisar a los usuarios y evitar conflictos con reservas ya tomadas.'
+  }
 ];
 
 export default function AdminFAQPage() {

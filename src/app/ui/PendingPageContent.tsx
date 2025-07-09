@@ -5,7 +5,7 @@ import { useCart } from '../ui/CartContext';
 import { useSearchParams } from 'next/navigation';
 
 export default function PendingPageContent() {
-  const { items, clear } = useCart();
+  const { items, clear, isHydrated } = useCart();
   const searchParams = useSearchParams();
 
   // Convert local date and time to UTC for database storage
@@ -57,6 +57,8 @@ export default function PendingPageContent() {
         });
     }
   }, [searchParams, items, clear]);
+
+  if (!isHydrated) return null;
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-yellow-50">
