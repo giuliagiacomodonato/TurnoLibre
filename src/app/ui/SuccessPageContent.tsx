@@ -3,10 +3,12 @@ import Link from 'next/link';
 import { useEffect } from 'react';
 import { useCart } from '../ui/CartContext';
 import { useSearchParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 
 export default function SuccessPageContent() {
   const { items, clear } = useCart();
   const searchParams = useSearchParams();
+  const { data: session } = useSession();
 
   // Convert local date and time to UTC for database storage
   const formatDateTimeToUTC = (dateStr: string, timeStr: string) => {
@@ -51,12 +53,28 @@ export default function SuccessPageContent() {
         .then(res => res.json())
         .then(data => {
           if (data.success) clear();
+          // --- WEBHOOK ---
+          if (session?.user) {
+            fetch('https://turnolibre.app.n8n.cloud/webhook/turnolibreEmail', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                nombre: session.user.name,
+                email: session.user.email,
+                reservas: items.map(r => ({
+                  fecha: r.date,
+                  hora: r.time,
+                  cancha: r.court || r.facilityId,
+                })),
+              }),
+            }).catch(() => {});
+          }
         })
         .catch(err => {
           console.error("Error processing checkout:", err);
         });
     }
-  }, [searchParams, items, clear]);
+  }, [searchParams, items, clear, session]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-green-50">
