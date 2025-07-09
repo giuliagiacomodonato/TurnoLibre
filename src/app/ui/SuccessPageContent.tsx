@@ -1,6 +1,6 @@
  'use client';
 import Link from 'next/link';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useCart } from '../ui/CartContext';
 import { useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
@@ -9,6 +9,7 @@ export default function SuccessPageContent() {
   const { items, clear } = useCart();
   const searchParams = useSearchParams();
   const { data: session } = useSession();
+  const processed = useRef(false);
 
   // Convert local date and time to UTC for database storage
   const formatDateTimeToUTC = (dateStr: string, timeStr: string) => {
@@ -25,7 +26,8 @@ export default function SuccessPageContent() {
 
   useEffect(() => {
     const payment_id = searchParams.get('payment_id');
-    if (payment_id && items.length > 0) {
+    if (payment_id && items.length > 0 && !processed.current) {
+      processed.current = true;
       // Prepare items with proper UTC date/time format
       const processedItems = items.map(item => {
         // Create a copy of the item with date properly formatted for UTC

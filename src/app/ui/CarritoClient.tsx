@@ -14,6 +14,15 @@ export default function CarritoClient() {
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{ open: boolean; message: string; type?: 'success' | 'error' }>({ open: false, message: '' });
 
+  // Filtrar items cuya fecha y hora ya pasaron
+  const filteredItems = items.filter(item => {
+    if (!item.date || !item.time) return true;
+    const [year, month, day] = item.date.split('-').map(Number);
+    const [hours, minutes] = item.time.split(':').map(Number);
+    const itemDate = new Date(year, month - 1, day, hours, minutes);
+    return itemDate.getTime() > Date.now();
+  });
+
   const handleCheckout = async () => {
     if (!session) {
       setShowLogin(true);
@@ -26,7 +35,7 @@ export default function CarritoClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'create_preference',
-          items: items.map((item, idx) => ({
+          items: filteredItems.map((item, idx) => ({
             id: item.id?.toString() || `item-${idx}`,
             title: item.name,
             quantity: 1,
@@ -56,7 +65,7 @@ export default function CarritoClient() {
           null
         ) : (
           <>
-           <Cart items={items} onRemove={removeItem} onCheckout={handleCheckout} loading={loading} />
+           <Cart items={filteredItems} onRemove={removeItem} onCheckout={handleCheckout} loading={loading} />
           </>
         )}
         <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} callbackUrl="/inicio/carrito" />
