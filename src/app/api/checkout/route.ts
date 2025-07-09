@@ -43,7 +43,21 @@ export async function POST(request: NextRequest) {
       else if (estado === 'pending') status = PaymentStatus.PENDING;
     }
 
-   
+    // Buscar si ya existe un pago similar (sin restricción de tiempo)
+    const pagoExistente = await prisma.payment.findFirst({
+      where: {
+        amount,
+        status,
+        reservations: {
+          some: { userId: user.id }
+        }
+      },
+      include: { reservations: true },
+    });
+    if (pagoExistente) {
+      return NextResponse.json({ success: true, pago: pagoExistente, reservas: pagoExistente.reservations });
+    }
+
     const pago = await prisma.payment.create({
       data: {
         amount,
@@ -112,6 +126,19 @@ export async function POST(request: NextRequest) {
         
         console.log(`Creando reserva para facilityId=${item.facilityId}, startTime=${startTime.toISOString()}, endTime=${endTime.toISOString()}, slotDuration=${slotDuration} minutos`);
         
+        // Buscar si ya existe una reserva igual
+        const reservaExistente = await prisma.reservation.findFirst({
+          where: {
+            userId: user.id,
+            facilityId: item.facilityId,
+            startTime: startTime,
+            endTime: endTime,
+          },
+        });
+        if (reservaExistente) {
+          return reservaExistente;
+        }
+
         const reserva = await prisma.reservation.create({
           data: {
             userId: user.id,
