@@ -8,6 +8,7 @@ import { useCart } from './CartContext';
 import { toZonedTime } from 'date-fns-tz';
 import { format, parseISO } from 'date-fns';
 import type { Sport, Facility, Location, LocationSchedule } from '@/lib/types';
+import { clearAvailabilityCache } from '@/lib/utils';
 
 export default function HomeClient({ sports: initialSports, locations: initialLocations, facilities: initialFacilities }: { sports: Sport[]; locations: Location[]; facilities: Facility[] }) {
   const [sports, setSports] = useState<Sport[]>(initialSports);
@@ -63,7 +64,7 @@ export default function HomeClient({ sports: initialSports, locations: initialLo
   }
 
   // Function to fetch latest sports data and generate availability (OPTIMIZADO)
-  const updateAvailability = async () => {
+  const updateAvailability = async (forceRefresh = false) => {
     setIsLoadingAvailability(true);
     try {
       // Solo facilities del deporte seleccionado
@@ -107,15 +108,19 @@ export default function HomeClient({ sports: initialSports, locations: initialLo
           // --- CACHE: Revisar localStorage ---
           const cacheKey = `availability_${facility.id}_${dateString}`;
           let blocks = null;
-          const cached = typeof window !== 'undefined' ? localStorage.getItem(cacheKey) : null;
-          if (cached) {
-            try {
-              const { data, timestamp } = JSON.parse(cached);
-              // Considera válido el cache por 2 minutos
-              if (Date.now() - timestamp < 2 * 60 * 1000) {
-                blocks = data;
-              }
-            } catch {}
+          
+          // Si forceRefresh es true, saltar el caché
+          if (!forceRefresh) {
+            const cached = typeof window !== 'undefined' ? localStorage.getItem(cacheKey) : null;
+            if (cached) {
+              try {
+                const { data, timestamp } = JSON.parse(cached);
+                // Considera válido el cache por 2 minutos
+                if (Date.now() - timestamp < 2 * 60 * 1000) {
+                  blocks = data;
+                }
+              } catch {}
+            }
           }
           if (!blocks) {
             // Si no hay cache, consulta la API
@@ -152,6 +157,21 @@ export default function HomeClient({ sports: initialSports, locations: initialLo
   // Initial data fetch on component mount
   useEffect(() => {
     updateAvailability();
+    
+    // Listener para refrescar disponibilidad cuando el usuario regresa a la página
+    const handleFocus = () => {
+      // Limpiar caché y refrescar cuando el usuario regresa a la página
+      clearAvailabilityCache();
+      if (selectedSport && selectedDate) {
+        updateAvailability(true);
+      }
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
     // eslint-disable-next-line
   }, []);
 
@@ -247,7 +267,8 @@ export default function HomeClient({ sports: initialSports, locations: initialLo
       handleClosePopup();
       setToastMessage('Turno agregado al carrito exitosamente');
       setShowToast(true);
-      updateAvailability();
+      // Forzar refresco sin caché para asegurar datos actualizados
+      updateAvailability(true);
     }
   };
 

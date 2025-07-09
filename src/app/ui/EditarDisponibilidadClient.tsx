@@ -63,7 +63,7 @@ export default function EditarDisponibilidadClient({ facilities: initialFaciliti
     // eslint-disable-next-line
   }, [selectedFacility, selectedDate]);
 
-  const generateAvailability = async () => {
+  const generateAvailability = async (forceRefresh = false) => {
     setIsLoading(true);
     const newAvailability: Availability = {};
     const facility = facilities.find(f => f.id === selectedFacility);
@@ -110,15 +110,20 @@ export default function EditarDisponibilidadClient({ facilities: initialFaciliti
     // --- CACHE: Revisar localStorage ---
     const cacheKey = `availability_${selectedFacility}_${dateString}`;
     let blocks = null;
-    const cached = typeof window !== 'undefined' ? localStorage.getItem(cacheKey) : null;
-    if (cached) {
-      try {
-        const { data, timestamp } = JSON.parse(cached);
-        if (Date.now() - timestamp < 2 * 60 * 1000) {
-          blocks = data;
-        }
-      } catch {}
+    
+    // Si forceRefresh es true, saltar el caché
+    if (!forceRefresh) {
+      const cached = typeof window !== 'undefined' ? localStorage.getItem(cacheKey) : null;
+      if (cached) {
+        try {
+          const { data, timestamp } = JSON.parse(cached);
+          if (Date.now() - timestamp < 2 * 60 * 1000) {
+            blocks = data;
+          }
+        } catch {}
+      }
     }
+    
     if (!blocks) {
       try {
         const res = await fetch(`/api/availability/blocks?date=${dateString}&facilityId=${selectedFacility}`);
@@ -221,7 +226,8 @@ export default function EditarDisponibilidadClient({ facilities: initialFaciliti
         throw new Error('Error al cancelar la reserva');
       }
       
-      await generateAvailability();
+      // Forzar refresco sin usar caché para asegurar datos actualizados
+      await generateAvailability(true);
       setToastMessage(`Reserva del horario ${time} cancelada con éxito.`);
       setShowToast(true);
     } catch (error) {
@@ -257,7 +263,8 @@ export default function EditarDisponibilidadClient({ facilities: initialFaciliti
       if (!response.ok) {
         throw new Error('Error al actualizar la disponibilidad');
       }
-      await generateAvailability();
+      // Forzar refresco sin usar caché para asegurar datos actualizados
+      await generateAvailability(true);
       setToastMessage(`Horario ${time} ${action === 'bloquear' ? 'bloqueado' : 'desbloqueado'} con éxito.`);
       setShowToast(true);
     } catch (error) {

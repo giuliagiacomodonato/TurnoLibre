@@ -1,9 +1,10 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { format, parseISO, isBefore } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toZonedTime } from 'date-fns-tz';
 import { Toast } from './Toast';
+import { clearAvailabilityCache } from '@/lib/utils';
 
 interface Reservation {
   id: string;
@@ -34,17 +35,19 @@ export default function ReservasCliente({ reservas }: { reservas: Reservation[] 
   const [toast, setToast] = useState({ open: false, message: '' });
 
   const now = new Date();
-  const filteredReservations = localReservations.filter(reservation => {
-    const startTime = parseISO(reservation.startTime);
-    if (activeTab === 'activas') {
-      return reservation.status === 'CONFIRMED' && !isBefore(startTime, now);
-    } else if (activeTab === 'pasadas') {
-      return reservation.status === 'CONFIRMED' && isBefore(startTime, now);
-    } else if (activeTab === 'canceladas') {
-      return reservation.status === 'CANCELLED';
-    }
-    return false;
-  });
+  const filteredReservations = useMemo(() => {
+    return localReservations.filter(reservation => {
+      const startTime = parseISO(reservation.startTime);
+      if (activeTab === 'activas') {
+        return reservation.status === 'CONFIRMED' && !isBefore(startTime, now);
+      } else if (activeTab === 'pasadas') {
+        return reservation.status === 'CONFIRMED' && isBefore(startTime, now);
+      } else if (activeTab === 'canceladas') {
+        return reservation.status === 'CANCELLED';
+      }
+      return false;
+    });
+  }, [localReservations, activeTab, now]);
 
   const getStatusLabel = (status: string) => {
     switch (status) {
@@ -82,17 +85,24 @@ export default function ReservasCliente({ reservas }: { reservas: Reservation[] 
         throw new Error('Error al cancelar la reserva');
       }
       
-      // Update local state
+      // Update local state with the cancelled reservation
+      const updatedReservation = { 
+        ...selectedReservation, 
+        status: 'CANCELLED', 
+        reason: cancelReason.trim() 
+      };
+      
       setLocalReservations(prev => prev.map(reservation => 
         reservation.id === selectedReservation.id 
-          ? { ...reservation, status: 'CANCELLED', reason: cancelReason.trim() }
+          ? updatedReservation
           : reservation
       ));
       
-      // Clear selection and close modal
-      setSelectedReservation(null);
-      setShowCancelModal(false);
-      setCancelReason('');
+      // Limpiar caché de disponibilidad para asegurar datos actualizados
+      clearAvailabilityCache();
+      
+      // Clear selection and close modal immediately
+      clearSelection();
       setToast({ open: true, message: 'Reserva cancelada con éxito' });
       
     } catch (error) {
@@ -107,6 +117,33 @@ export default function ReservasCliente({ reservas }: { reservas: Reservation[] 
     setShowCancelModal(true);
     setCancelReason('');
   };
+
+  // Función para limpiar completamente la selección
+  const clearSelection = () => {
+    setSelectedReservation(null);
+    setShowCancelModal(false);
+    setCancelReason('');
+  };
+
+  // Sincronizar el estado cuando cambien las reservas
+  useEffect(() => {
+    setLocalReservations(reservas);
+  }, [reservas]);
+
+  // Limpiar selección si la reserva seleccionada no pertenece a la pestaña actual
+  useEffect(() => {
+    if (selectedReservation) {
+      const startTime = parseISO(selectedReservation.startTime);
+      const shouldBeInCurrentTab = 
+        (activeTab === 'activas' && selectedReservation.status === 'CONFIRMED' && !isBefore(startTime, now)) ||
+        (activeTab === 'pasadas' && selectedReservation.status === 'CONFIRMED' && isBefore(startTime, now)) ||
+        (activeTab === 'canceladas' && selectedReservation.status === 'CANCELLED');
+      
+      if (!shouldBeInCurrentTab) {
+        clearSelection();
+      }
+    }
+  }, [activeTab, selectedReservation, now]);
 
   useEffect(() => {
     if (toast.open) {
@@ -124,19 +161,19 @@ export default function ReservasCliente({ reservas }: { reservas: Reservation[] 
         <div className="flex border-b border-gray-200 mb-4">
           <button
             className={`py-2 px-4 text-sm font-medium ${activeTab === 'activas' ? 'border-b-2 border-[#426a5a] text-[#426a5a]' : 'text-gray-500 hover:text-gray-700'}`}
-            onClick={() => { setActiveTab('activas'); setSelectedReservation(null); }}
+            onClick={() => { setActiveTab('activas'); clearSelection(); }}
           >
             ACTIVAS
           </button>
           <button
             className={`py-2 px-4 text-sm font-medium ${activeTab === 'pasadas' ? 'border-b-2 border-[#426a5a] text-[#426a5a]' : 'text-gray-500 hover:text-gray-700'}`}
-            onClick={() => { setActiveTab('pasadas'); setSelectedReservation(null); }}
+            onClick={() => { setActiveTab('pasadas'); clearSelection(); }}
           >
             PASADAS
           </button>
           <button
             className={`py-2 px-4 text-sm font-medium ${activeTab === 'canceladas' ? 'border-b-2 border-[#426a5a] text-[#426a5a]' : 'text-gray-500 hover:text-gray-700'}`}
-            onClick={() => { setActiveTab('canceladas'); setSelectedReservation(null); }}
+            onClick={() => { setActiveTab('canceladas'); clearSelection(); }}
           >
             CANCELADAS
           </button>

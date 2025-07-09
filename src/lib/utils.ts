@@ -26,4 +26,16 @@ export const DIAS_ORDEN = [
   'Sábado',
   'Domingo',
   'Feriados'
-]; 
+];
+
+// Función global para limpiar el caché de disponibilidad
+export const clearAvailabilityCache = () => {
+  if (typeof window !== 'undefined') {
+    const keys = Object.keys(localStorage);
+    keys.forEach(key => {
+      if (key.startsWith('availability_')) {
+        localStorage.removeItem(key);
+      }
+    });
+  }
+}; 
