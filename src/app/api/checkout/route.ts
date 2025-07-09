@@ -43,8 +43,8 @@ export async function POST(request: NextRequest) {
       else if (estado === 'pending') status = PaymentStatus.PENDING;
     }
 
-    // Buscar si ya existe un pago similar (sin restricción de tiempo)
-    const pagoExistente = await prisma.payment.findFirst({
+    // Buscar si ya existe un pago igual (mismo amount, status, usuario y reservas exactas)
+    const pagosUsuario = await prisma.payment.findMany({
       where: {
         amount,
         status,
@@ -53,6 +53,29 @@ export async function POST(request: NextRequest) {
         }
       },
       include: { reservations: true },
+    });
+    // Generar un set de reservas esperadas
+    const reservasEsperadas = items.map((item: any) => ({
+      facilityId: item.facilityId,
+      // startTime y endTime en ISO string para comparar
+      startTime: item.startTimeUTC ? new Date(item.startTimeUTC).toISOString() : new Date(`${item.date}T${item.time}`).toISOString(),
+      endTime: (() => {
+        const slotDuration = 60; // No tenemos el slot real aquí, pero es aproximado
+        const start = item.startTimeUTC ? new Date(item.startTimeUTC) : new Date(`${item.date}T${item.time}`);
+        return new Date(start.getTime() + slotDuration * 60 * 1000).toISOString();
+      })(),
+    }));
+    // Buscar un pago cuyas reservas coincidan exactamente
+    const pagoExistente = pagosUsuario.find(pago => {
+      if (pago.reservations.length !== reservasEsperadas.length) return false;
+      // Para cada reserva esperada debe haber una reserva real igual
+      return reservasEsperadas.every(esperada =>
+        pago.reservations.some(real =>
+          real.facilityId === esperada.facilityId &&
+          real.startTime.toISOString() === esperada.startTime &&
+          real.endTime.toISOString() === esperada.endTime
+        )
+      );
     });
     if (pagoExistente) {
       return NextResponse.json({ success: true, pago: pagoExistente, reservas: pagoExistente.reservations });
