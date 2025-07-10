@@ -32,7 +32,7 @@ Esta plataforma permite a usuarios reservar canchas deportivas, gestionar pagos 
 
 - **MercadoPago**: Integración completa para pagos online. El backend verifica el estado del pago antes de confirmar la reserva.
 - **Cloudinary**: API de Servicio de almacenamiento en la nube para imágenes de canchas y complejos deportivos. Permite subir, optimizar y servir imágenes de manera eficiente.
-- **Webhook de n8n para email generado con IA**: Tras el pago exitoso, se envía un webhook a un endpoint externo (n8n) con los detalles de la reserva, que dispara el envío de email de confirmación al usuario generado con un Agente IA de Open AI ChatModel.
+- **Webhook de n8n para email generado con IA**: Tras el pago exitoso, se envía un webhook a un endpoint externo (n8n) con los detalles de la reserva, que dispara el envío de email de confirmación al usuario generado con un Agente IA de Open AI ChatModel. (1)
 - **Push Notifications**: Los usuarios pueden suscribirse a notificaciones push. Los administradores pueden enviar mensajes a todos los suscriptores desde el panel.
 
 ---
@@ -111,3 +111,7 @@ En cualquier otro caso la reserva nunca se crea
 ## Enlace de la aplicación
 
 **TurnoLibre** - Plataforma de reservas deportivas: [https://proyecto-2-giacomodonato-kreczmer.vercel.app/](https://proyecto-2-giacomodonato-kreczmer.vercel.app/)
+
+(1)
+![workflow ai](https://github.com/user-attachments/assets/c415ecf3-f64e-472f-a9b7-713ef3a7db84)
+
