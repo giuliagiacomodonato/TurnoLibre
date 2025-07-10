@@ -62,8 +62,9 @@ Esta plataforma permite a usuarios reservar canchas deportivas, gestionar pagos 
 
 ## Posibles mejoras
 - Generar los slot de disponibilidad de la proxima semana con un script automático.
-- Mejora en el manejo de la iminación/creación/actualización de las reglas de las canchas.
+- Mejora en el manejo de la eliminación/creación/actualización de las reglas de las canchas.
 - Añadir registro de usuarios propio o más prestadores de OAuth
+- Gestión real de los dias feriados
 
 ## Para probar el uso de Mercado Pago
 - Cuenta test-vendedor
