@@ -21,7 +21,7 @@ Esta plataforma permite a usuarios reservar canchas deportivas, gestionar pagos 
 ### Administradores
 - **Login seguro obligatorio** Uso de NextAuth.
 - **Gestión de canchas**: crear, editar, eliminar canchas.
-- **Gestión de reglas**: agregar, editar, eliminar reglas de uso y penalizaciones, agrupadas por fecha de vigencia.
+- **Gestión de reglas**: agregar, editar, eliminar reglas de uso, agrupadas por fecha de vigencia.
 - **Visualización y gestión de reservas**: ver todas las reservas, filtrar por estado, cancelar o marcar como completadas.
 - **Envío de notificaciones push** a usuarios.
 - **Reporte de reservas y pagos**.
