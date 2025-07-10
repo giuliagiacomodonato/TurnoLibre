@@ -2,7 +2,7 @@
 
 ## Descripción General
 
-Esta plataforma permite a usuarios reservar canchas deportivas, gestionar pagos en línea mediante MercadoPago, y recibir notificaciones por email y push. Incluye un panel de administración para gestionar canchas, reglas y reservas. El sistema implementa deduplicación de pagos/reservas y flujos robustos para evitar errores comunes en reservas y cobros.
+Esta plataforma permite a usuarios reservar canchas deportivas, gestionar pagos en línea mediante MercadoPago, y recibir notificaciones por email y push. Incluye un panel de administración para gestionar canchas, reglas y reservas.
 
 ---
 
@@ -65,6 +65,12 @@ Esta plataforma permite a usuarios reservar canchas deportivas, gestionar pagos 
 - Mejora en el manejo de la eliminación/creación/actualización de las reglas de las canchas.
 - Añadir registro de usuarios propio o más prestadores de OAuth
 - Gestión real de los dias feriados
+
+  
+## Para probar admin
+-Ir a https://proyecto-2-giacomodonato-kreczmer.vercel.app/admin
+-Usuario: admin@email.com
+-Contraseña: admin123
 
 ## Para probar el uso de Mercado Pago
 - Cuenta test-vendedor
