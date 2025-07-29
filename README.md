@@ -1,5 +1,7 @@
 # Plataforma de Reservas Deportivas – Next.js, Prisma, PostgreSQL
 
+<img width="504" height="153" alt="image" src="https://github.com/user-attachments/assets/cff27d56-3fb0-4eb7-b9c5-4c74d15e32f4" />
+
 ## Descripción General
 
 Esta plataforma permite a usuarios reservar canchas deportivas, gestionar pagos en línea mediante MercadoPago, y recibir notificaciones por email y push. Incluye un panel de administración para gestionar canchas, reglas y reservas.
@@ -69,21 +71,9 @@ Esta plataforma permite a usuarios reservar canchas deportivas, gestionar pagos 
   
 ## Para probar admin
 -Ir a https://proyecto-2-giacomodonato-kreczmer.vercel.app/admin
--Usuario: admin@email.com
--Contraseña: admin123
 
 ## Para probar el uso de Mercado Pago
-- Cuenta test-vendedor
-Vendedor
-TESTUSER1418671037
-s0fxOYYWXw
-20/06/2025
-
-- Cuenta test-comprador
-Comprador
-TESTUSER652121358
-A5SSbmazNE
-20/06/2025
+SOLO CON CUENTAS TEST DE COMPRADOR
 
 - Tarjetas falsas
 Tarjeta	- Número - Código de seguridad - Fecha de caducidad
